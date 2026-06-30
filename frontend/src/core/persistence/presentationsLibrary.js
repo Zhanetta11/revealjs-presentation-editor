@@ -1,4 +1,5 @@
 import { storageAdapter } from "./storageAdapter";
+import { serializePresentation } from "./serializationOperations";
 
 const INDEX_KEY = "presentations_index";
 
@@ -79,6 +80,6 @@ export async function loadPresentation(id) {
 
 export async function savePresentation(id, data) {
   const title = data?.slideset?.title ?? data?.slideset?.filename ?? "Untitled Presentation";
-  await storageAdapter.set(presentationKey(id), data);
+  await storageAdapter.set(presentationKey(id), serializePresentation(data));
   await updateIndexEntry(id, title);
 }

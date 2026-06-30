@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useRecentPresentations } from "../../hooks/useRecentPresentations";
 import "./FileMenu.css";
 import { greeting, formatDate } from "../../core/utils/dateUtils";
+import { isElectron, getElectronAPI } from "../../core/platform/electron";
 
 const NAV_ITEMS = [
   { label: "Home",        section: "top" },
@@ -37,8 +38,20 @@ export default function FileMenu({
     if (item === "Save") { onSave(); onClose(); return; }
     if (item === "Export HTML") { onExport(); onClose(); return; }
     if (item === "Export ZIP") { onExportZip?.(); onClose(); return; }
-    if (item === "Open") { fileInputRef.current?.click(); return; }
+    if (item === "Open") { handleOpen(); return; }
     setActiveItem(item);
+  };
+
+  const handleOpen = async () => {
+    if (isElectron()) {
+      const api = getElectronAPI();
+      const [filePath] = await api.openFile();
+      if (!filePath) return;
+      const content = await api.readFile(filePath);
+      onLoadFile?.(content);
+      return;
+    }
+    fileInputRef.current?.click();
   };
 
   const handleFileChange = (e) => {

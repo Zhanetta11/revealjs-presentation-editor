@@ -156,11 +156,17 @@ ipcMain.handle('dialog:openFile', async () => {
   return result.filePaths;
 });
 
-ipcMain.handle('dialog:saveFile', async (event, defaultName) => {
-  logger.debug('Save file dialog requested', { defaultName });
+const SAVE_FILTERS = {
+  json: [{ name: 'JSON', extensions: ['json'] }],
+  html: [{ name: 'HTML', extensions: ['html'] }],
+  zip: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+};
+
+ipcMain.handle('dialog:saveFile', async (event, defaultName, extension) => {
+  logger.debug('Save file dialog requested', { defaultName, extension });
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName || 'presentation.json',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
+    filters: SAVE_FILTERS[extension] || SAVE_FILTERS.json,
   });
   if (result.filePath) {
     logger.info('File save path selected', { path: result.filePath });

@@ -22,6 +22,7 @@ import {
 import { getPresentationTitle } from "../core/utils/presentationUtils";
 import { getSlideTransition } from "../core/model/transitionDefaults";
 import { importPresentationFromJson } from "../core/persistence/importPresentation";
+import { isElectron, getElectronAPI } from "../core/platform/electron";
 import { createTextElementDefaults } from "../core/model/masterDefaults";
 import { updateThemeBackground } from "../core/model/designThemes";
 import { updateMasterThemeColor } from "../core/operations/themeOperations";
@@ -1361,6 +1362,31 @@ useEffect(() => {
     },
     [navigate],
   );
+
+  const handleElectronOpen = useCallback(async () => {
+    const api = getElectronAPI();
+    const [filePath] = await api.openFile();
+    if (!filePath) return;
+    const content = await api.readFile(filePath);
+    await handleLoadFile(content);
+  }, [handleLoadFile]);
+
+  useEffect(() => {
+    if (!isElectron()) return;
+    const api = getElectronAPI();
+
+    const unsubscribers = [
+      api.onMenuNew(handleNew),
+      api.onMenuOpen(handleElectronOpen),
+      api.onMenuSave(savePresentation),
+      api.onMenuSaveAs(handleSaveAs),
+      api.onFileDrop(async (filePath) => {
+        const content = await api.readFile(filePath);
+        await handleLoadFile(content);
+      }),
+    ];
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [handleNew, handleElectronOpen, savePresentation, handleSaveAs, handleLoadFile]);
 
   const handleDeleteAndGoHome = useCallback(async () => {
     if (!presentationId) return;

@@ -19,3 +19,13 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Electron
+electron-builder/
+out/
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.zip

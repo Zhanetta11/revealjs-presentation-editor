@@ -8,6 +8,7 @@ import {
   SHARED_KEYS,
   RUN_LEVEL_KEYS,
   buildRunStyles,
+  computeCurrentFormatting,
 } from "../text/textFormatting";
 
 describe("key classification", () => {
@@ -168,6 +169,50 @@ describe("paragraphsToHTML", () => {
     expect(html).toContain("padding-left");
   });
 
+  it("renders Before text indentation for ordinary paragraphs", () => {
+    const html = paragraphsToHTML([
+      makePara("Indented", { "before-text": 36 }),
+    ]);
+    expect(html).toContain("padding-left:36px");
+  });
+
+  it("renders legacy non-list indent levels consistently", () => {
+    const html = paragraphsToHTML([
+      makePara("Indented", { "indent-level": 2 }),
+    ]);
+    expect(html).toContain("padding-left:48px");
+  });
+
+  it("combines Before text with hanging indentation", () => {
+    const html = paragraphsToHTML([
+      makePara("Indented", {
+        "before-text": 20,
+        "special-indent": "hanging",
+        "special-indent-by": 10,
+      }),
+    ]);
+    expect(html).toContain("padding-left:calc(20px + 10px)");
+    expect(html).toContain("text-indent:-10px");
+  });
+
+  it("explicitly clears inherited special indentation", () => {
+    const html = paragraphsToHTML(
+      [
+        makePara("Plain", {
+          "special-indent": "none",
+          "special-indent-by": 0,
+          "text-indent": "0px",
+        }),
+      ],
+      {
+        "special-indent": "first-line",
+        "special-indent-by": 24,
+        "text-indent": "24px",
+      },
+    );
+    expect(html).not.toContain("text-indent:");
+  });
+
   it("numbered list counter increments correctly", () => {
     const paras = [
       makePara("First", { "list-type": "numbered" }),
@@ -224,6 +269,42 @@ describe("paragraphsToHTML", () => {
       {},
     );
     expect(html).toContain("text-align:left");
+  });
+});
+
+describe("computeCurrentFormatting paragraph selections", () => {
+  it("reports mixed paragraph and run formatting across selected paragraphs", () => {
+    const selectedTextEl = {
+      paragraphs: [
+        {
+          formatting: { align: "left", margin: "0px" },
+          runs: [{ text: "First", formatting: { color: "#111111" } }],
+        },
+        {
+          formatting: { align: "right", margin: "8px 0" },
+          runs: [{ text: "Second", formatting: { color: "#222222" } }],
+        },
+      ],
+    };
+
+    const result = computeCurrentFormatting({
+      isEditing: true,
+      activeSelection: {
+        elementId: "text-1",
+        paragraphIdx: 0,
+        rangeStart: 0,
+        endParagraphIdx: 1,
+        rangeEnd: 6,
+      },
+      selectedElementId: "text-1",
+      selectedTextEl,
+      effectiveFormatting: { align: "left", color: "#111111", margin: "0px" },
+      pendingFormatting: {},
+    });
+
+    expect(result.align).toBe("mixed");
+    expect(result.margin).toBe("mixed");
+    expect(result.color).toBe("mixed");
   });
 });
 

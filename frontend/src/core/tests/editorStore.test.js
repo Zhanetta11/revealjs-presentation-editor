@@ -192,6 +192,42 @@ describe("editorReducer", () => {
     expect(result.past).toHaveLength(1);
   });
 
+  test("groups media replacement into one atomic history transaction", () => {
+    let state = createInitialEditorState();
+    const textId = state.presentation.slideset.slides[0].contents.text[0].id;
+
+    state = editorReducer(state, {
+      type: EditorEventType.HISTORY.BEGIN,
+      payload: {},
+    });
+    state = editorReducer(state, {
+      type: EditorEventType.MEDIA.ADD,
+      payload: {
+        mediaElement: { id: "picture-paste", "media-type": "image" },
+      },
+    });
+    state = editorReducer(state, {
+      type: EditorEventType.ELEMENT.UPDATE,
+      payload: { elementId: textId, updates: { hidden: true } },
+    });
+    state = editorReducer(state, {
+      type: EditorEventType.HISTORY.COMMIT,
+      payload: {},
+    });
+    state = editorReducer(state, {
+      type: EditorEventType.HISTORY.UNDO,
+      payload: {},
+    });
+
+    const slide = state.presentation.slideset.slides[0];
+    expect(
+      slide.contents.media.some((media) => media.id === "picture-paste"),
+    ).toBe(false);
+    expect(
+      slide.contents.text.find((element) => element.id === textId)?.hidden,
+    ).not.toBe(true);
+  });
+
   test("MASTER.UPDATE_THEME stores theme metadata without mutating prior state", () => {
     const state = createInitialEditorState();
     const previousMaster = state.presentation.slideset.master;

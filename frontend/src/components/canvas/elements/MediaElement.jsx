@@ -5,6 +5,7 @@ import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,
   buildMediaFilterStyle,
+  buildMediaBorderOverlayStyle,
   buildBevelOverlayStyle,
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
@@ -130,6 +131,7 @@ export default function MediaElement({
 
   const mediaFilter = buildMediaFilterStyle(styledMedia);
   const filteredInnerStyle = mediaFilter ? { ...innerStyle, filter: mediaFilter } : innerStyle;
+  const borderOverlayStyle = buildMediaBorderOverlayStyle(styledMedia);
   const bevelOverlayStyle = buildBevelOverlayStyle(styledMedia);
   const reflectionStyle = buildMediaReflectionStyle(styledMedia, { relative: true });
   const reflectionContentStyle = buildMediaReflectionContentStyle(styledMedia);
@@ -378,6 +380,10 @@ export default function MediaElement({
         </div>
       )}
 
+      {!isCropping && borderOverlayStyle && (
+        <div style={borderOverlayStyle} />
+      )}
+
       {/* Bevel overlay — rendered above image so inset shadow is visible */}
       {!isCropping && bevelOverlayStyle && (
         <div style={bevelOverlayStyle} />
@@ -387,6 +393,7 @@ export default function MediaElement({
         <div style={reflectionStyle} aria-hidden="true">
           <div style={reflectionContentStyle}>
             <img src={resolvedSrc} alt="" className="canvas-media" style={filteredInnerStyle} />
+            {borderOverlayStyle && <div style={borderOverlayStyle} />}
             {bevelOverlayStyle && <div style={bevelOverlayStyle} />}
           </div>
         </div>

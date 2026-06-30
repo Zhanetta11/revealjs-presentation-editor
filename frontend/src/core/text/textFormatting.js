@@ -106,12 +106,20 @@ export const computeCurrentFormatting = ({
 
   if (hasRealSelection) {
     const paragraphs = selectedTextEl?.paragraphs ?? [];
-    const paraFmt = paragraphs[sel.paragraphIdx]?.formatting ?? {};
     const epIdx = sel.endParagraphIdx ?? sel.paragraphIdx;
+    const selectedParagraphs = [];
     const overlapping = [];
     for (let pIdx = sel.paragraphIdx; pIdx <= epIdx; pIdx++) {
       const para = paragraphs[pIdx];
       if (!para) continue;
+      const isTrailingBoundary =
+        pIdx === epIdx &&
+        epIdx > sel.paragraphIdx &&
+        sel.rangeEnd === 0;
+      if (isTrailingBoundary) continue;
+
+      const paraFmt = para.formatting ?? {};
+      selectedParagraphs.push(paraFmt);
       const pStart = pIdx === sel.paragraphIdx ? sel.rangeStart : 0;
       const pEnd = pIdx === epIdx ? sel.rangeEnd : Infinity;
       let offset = 0;
@@ -119,20 +127,47 @@ export const computeCurrentFormatting = ({
         const start = offset;
         const end = offset + run.text.length;
         if (end > pStart && start < pEnd)
-          overlapping.push(run.formatting ?? {});
+          overlapping.push({
+            paragraphFormatting: paraFmt,
+            runFormatting: run.formatting ?? {},
+          });
         offset = end;
       }
     }
-    if (!overlapping.length) return paraFmt;
-    const allKeys = new Set([
-      ...Object.keys(paraFmt),
-      ...overlapping.flatMap((f) => Object.keys(f)),
-    ]);
-    const result = { ...paraFmt };
-    for (const key of allKeys) {
-      const vals = overlapping.map((f) => f[key] ?? paraFmt[key]);
+
+    const result = { ...effectiveFormatting };
+    const paragraphKeys = new Set(
+      selectedParagraphs.flatMap((formatting) =>
+        Object.keys(formatting).filter((key) => !RUN_LEVEL_KEYS.has(key)),
+      ),
+    );
+    for (const key of paragraphKeys) {
+      const vals = selectedParagraphs.map(
+        (formatting) => formatting[key] ?? effectiveFormatting[key],
+      );
       result[key] = vals.every((v) => v === vals[0]) ? vals[0] : "mixed";
     }
+
+    const runKeys = new Set([
+      ...Object.keys(effectiveFormatting).filter((key) => RUN_LEVEL_KEYS.has(key)),
+      ...selectedParagraphs.flatMap((formatting) =>
+        Object.keys(formatting).filter((key) => RUN_LEVEL_KEYS.has(key)),
+      ),
+      ...overlapping.flatMap(({ runFormatting }) =>
+        Object.keys(runFormatting).filter((key) => RUN_LEVEL_KEYS.has(key)),
+      ),
+    ]);
+    for (const key of runKeys) {
+      const vals = overlapping.map(
+        ({ paragraphFormatting, runFormatting }) =>
+          runFormatting[key] ??
+          paragraphFormatting[key] ??
+          effectiveFormatting[key],
+      );
+      if (vals.length > 0)
+        result[key] = vals.every((v) => v === vals[0]) ? vals[0] : "mixed";
+    }
+
     return result;
   }
 
@@ -181,9 +216,24 @@ export const resolveParagraphIndentStyles = (
   const specialIndent = resolveValue("special-indent");
   const specialIndentBy = parseIndentValue(resolveValue("special-indent-by"));
   const legacyTextIndent = parseIndentValue(resolveValue("text-indent"));
+  const beforeText = parseIndentValue(resolveValue("before-text"));
+  const legacyIndentLevel = parseIndentValue(resolveValue("indent-level"));
 
   let paddingLeft = basePaddingLeft;
   let textIndent = null;
+
+  if (beforeText != null && beforeText > 0) {
+    paddingLeft = basePaddingLeft
+      ? `calc(${basePaddingLeft} + ${beforeText}px)`
+      : `${beforeText}px`;
+  } else if (
+    !basePaddingLeft &&
+    beforeText == null &&
+    legacyIndentLevel != null &&
+    legacyIndentLevel > 0
+  ) {
+    paddingLeft = getListIndent(legacyIndentLevel - 1, "indent");
+  }
 
   if (
     (specialIndent === "first-line" || specialIndent === "hanging") &&
@@ -194,8 +244,8 @@ export const resolveParagraphIndentStyles = (
       textIndent = `${specialIndentBy}px`;
     } else {
       textIndent = `-${specialIndentBy}px`;
-      paddingLeft = basePaddingLeft
-        ? `calc(${basePaddingLeft} + ${specialIndentBy}px)`
+      paddingLeft = paddingLeft
+        ? `calc(${paddingLeft} + ${specialIndentBy}px)`
         : `${specialIndentBy}px`;
     }
   } else if (legacyTextIndent != null && legacyTextIndent !== 0) {
@@ -204,8 +254,8 @@ export const resolveParagraphIndentStyles = (
     } else {
       const hangingBy = Math.abs(legacyTextIndent);
       textIndent = `-${hangingBy}px`;
-      paddingLeft = basePaddingLeft
-        ? `calc(${basePaddingLeft} + ${hangingBy}px)`
+      paddingLeft = paddingLeft
+        ? `calc(${paddingLeft} + ${hangingBy}px)`
         : `${hangingBy}px`;
     }
   }

@@ -61,6 +61,7 @@ export default function CanvasContextMenu({
   const [search, setSearch] = useState("");
   const [submenu, setSubmenu] = useState(null);
   const [dialog, setDialog] = useState(null);
+  const [pasteError, setPasteError] = useState("");
   const isText = contextType === "text";
   const matches = (label) =>
     !search.trim() || label.toLowerCase().includes(search.trim().toLowerCase());
@@ -108,9 +109,18 @@ export default function CanvasContextMenu({
     };
   }, [dialog, onClose]);
 
-  const run = (action) => {
-    action?.();
-    onClose?.();
+  const run = async (action) => {
+    setPasteError("");
+    try {
+      const result = await action?.();
+      if (result === false) {
+        setPasteError("Clipboard content is not available for this paste option.");
+        return;
+      }
+      onClose?.();
+    } catch {
+      setPasteError("Clipboard content could not be pasted.");
+    }
   };
   const applyTextFormatting = (updates) => {
     onFormatText?.(elementId, updates);
@@ -223,11 +233,13 @@ export default function CanvasContextMenu({
             <div className="canvas-context-menu-heading">Paste Options:</div>
           )}
           {isText ? (
-            <div className="canvas-context-paste-options" role="group">
-              <PasteOptionButton
+            <>
+              <div className="canvas-context-paste-options" role="group">
+                <PasteOptionButton
                 icon={<MdContentPaste />}
                 badge="a"
                 title="Use Destination Theme"
+                disabled={!onPasteText}
                 onClick={() =>
                   run(() => onPasteText?.(elementId, "destination"))
                 }
@@ -236,6 +248,7 @@ export default function CanvasContextMenu({
                 icon={<MdContentPaste />}
                 badge="F"
                 title="Keep Source Formatting"
+                disabled={!onPasteText}
                 onClick={() =>
                   run(() =>
                     onPasteText?.(elementId, "source") ?? onPaste?.(),
@@ -246,15 +259,23 @@ export default function CanvasContextMenu({
                 icon={<MdImage />}
                 badge="▣"
                 title="Picture"
+                disabled={!onPastePicture}
                 onClick={() => run(() => onPastePicture?.(elementId))}
               />
               <PasteOptionButton
                 icon={<MdTextFields />}
                 badge="A"
                 title="Keep Text Only"
+                disabled={!onPasteText}
                 onClick={() => run(() => onPasteText?.(elementId, "text"))}
-              />
-            </div>
+                />
+              </div>
+              {pasteError && (
+                <div className="canvas-context-paste-error" role="status">
+                  {pasteError}
+                </div>
+              )}
+            </>
           ) : (
             <ContextMenuItem
               icon={<MdContentPaste />}

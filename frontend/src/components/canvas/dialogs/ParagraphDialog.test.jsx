@@ -66,6 +66,19 @@ describe("ParagraphDialog", () => {
     );
   });
 
+  test("onApply stores Before text as a rendered distance", () => {
+    const onApply = vi.fn();
+    renderDialog({ onApply });
+    const beforeTextInput = screen.getAllByRole("spinbutton")[0];
+
+    fireEvent.change(beforeTextInput, { target: { value: "36" } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ "before-text": 36 }),
+    );
+  });
+
   test("onApply receives line-spacing as string", () => {
     const onApply = vi.fn();
     renderDialog({ onApply, formatting: { "line-spacing": "1.5" } });
@@ -146,5 +159,48 @@ describe("ParagraphDialog", () => {
         "text-indent": "-18px",
       }),
     );
+  });
+
+  test("selecting no special indent explicitly clears inherited indentation", () => {
+    const onApply = vi.fn();
+    renderDialog({
+      onApply,
+      formatting: {
+        "special-indent": "first-line",
+        "special-indent-by": 18,
+        "text-indent": "18px",
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText(/special/i), {
+      target: { value: "none" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        "special-indent": "none",
+        "special-indent-by": 0,
+        "text-indent": "0px",
+      }),
+    );
+  });
+
+  test("does not overwrite unchanged mixed paragraph values", () => {
+    const onApply = vi.fn();
+    renderDialog({
+      onApply,
+      formatting: {
+        align: "mixed",
+        "before-text": "mixed",
+        margin: "mixed",
+        "line-spacing": "mixed",
+        "special-indent": "mixed",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(onApply).toHaveBeenCalledWith({});
   });
 });

@@ -72,10 +72,11 @@ export function buildMediaContainerStyle(media) {
   const rotation = media.rotation ?? 0;
   const styleId = media.effects?.["style-id"];
   const styleCss = styleId ? getStyleById(styleId).css : {};
-  const brd = media.effects?.border;
-  const borderCss = brd?.color
-    ? { border: `${brd.width ?? 2}px ${brd.dash ?? "solid"} ${brd.color}` }
-    : {};
+  const containerStyleCss = { ...styleCss };
+  delete containerStyleCss.border;
+  delete containerStyleCss.borderWidth;
+  delete containerStyleCss.borderStyle;
+  delete containerStyleCss.borderColor;
 
   const fx = media.effects ?? {};
   const shadowPreset  = findById(SHADOW_PRESETS,  fx.shadowId);
@@ -105,8 +106,7 @@ export function buildMediaContainerStyle(media) {
     zIndex: media["z-index"] ?? 1,
     overflow: "hidden",
     ...(media.opacity != null && media.opacity < 1 ? { opacity: media.opacity } : {}),
-    ...styleCss,
-    ...borderCss,
+    ...containerStyleCss,
     ...boxShadowCss,
     ...maskCss,
     ...(transforms || rot3d?.transform
@@ -115,6 +115,29 @@ export function buildMediaContainerStyle(media) {
           transformOrigin: "center center",
         }
       : {}),
+  };
+}
+
+export function buildMediaBorderOverlayStyle(media) {
+  const styleId = media.effects?.["style-id"];
+  const styleCss = styleId ? getStyleById(styleId).css : {};
+  const customBorder = media.effects?.border;
+  const borderProps = customBorder?.color
+    ? { border: `${customBorder.width ?? 2}px ${customBorder.dash ?? "solid"} ${customBorder.color}` }
+    : {
+        ...(styleCss.border ? { border: styleCss.border } : {}),
+        ...(styleCss.borderWidth ? { borderWidth: styleCss.borderWidth } : {}),
+        ...(styleCss.borderStyle ? { borderStyle: styleCss.borderStyle } : {}),
+        ...(styleCss.borderColor ? { borderColor: styleCss.borderColor } : {}),
+      };
+  if (Object.keys(borderProps).length === 0) return null;
+  return {
+    position: "absolute",
+    inset: 0,
+    boxSizing: "border-box",
+    pointerEvents: "none",
+    borderRadius: "inherit",
+    ...borderProps,
   };
 }
 
@@ -181,13 +204,6 @@ export function buildMediaReflectionStyle(media, { relative = false } = {}) {
 
 export function buildMediaReflectionContentStyle(media) {
   const containerStyle = buildMediaContainerStyle(media);
-  const {
-    border,
-    borderWidth,
-    borderStyle,
-    borderColor,
-    borderRadius,
-  } = containerStyle;
   return {
     position: "absolute",
     inset: 0,
@@ -195,11 +211,7 @@ export function buildMediaReflectionContentStyle(media) {
     height: media.height ?? 120,
     overflow: "hidden",
     boxSizing: "border-box",
-    ...(border ? { border } : {}),
-    ...(borderWidth ? { borderWidth } : {}),
-    ...(borderStyle ? { borderStyle } : {}),
-    ...(borderColor ? { borderColor } : {}),
-    ...(borderRadius ? { borderRadius } : {}),
+    ...(containerStyle.borderRadius ? { borderRadius: containerStyle.borderRadius } : {}),
     transform: "scaleY(-1)",
     transformOrigin: "center center",
   };

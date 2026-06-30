@@ -51,16 +51,38 @@ const getLineSpacingValueForMode = (mode, fallbackValue) => {
 };
 
 export default function ParagraphDialog({ formatting = {}, onApply, onClose }) {
-  const spacing = parseVerticalMargin(formatting.margin);
-  const specialIndent = parseSpecialIndent(formatting);
-  const initialLineSpacing = numberFrom(formatting["line-spacing"], 1.15);
-  const initialLineSpacingMode = getLineSpacingMode(initialLineSpacing);
+  const marginIsMixed = formatting.margin === "mixed";
+  const lineSpacingIsMixed = formatting["line-spacing"] === "mixed";
+  const specialIndentIsMixed =
+    formatting["special-indent"] === "mixed" ||
+    formatting["special-indent-by"] === "mixed" ||
+    formatting["text-indent"] === "mixed";
+  const beforeTextIsMixed =
+    formatting["before-text"] === "mixed" ||
+    formatting["indent-level"] === "mixed";
+  const spacing = marginIsMixed
+    ? { before: "", after: "" }
+    : parseVerticalMargin(formatting.margin);
+  const specialIndent = specialIndentIsMixed
+    ? { special: "mixed", by: "" }
+    : parseSpecialIndent(formatting);
+  const initialLineSpacing = lineSpacingIsMixed
+    ? ""
+    : numberFrom(formatting["line-spacing"], 1.15);
+  const initialLineSpacingMode = lineSpacingIsMixed
+    ? "mixed"
+    : getLineSpacingMode(initialLineSpacing);
+  const legacyBeforeText =
+    formatting["list-type"] && formatting["list-type"] !== "none"
+      ? 0
+      : Math.max(0, Number(formatting["indent-level"]) || 0) * 24;
+  const initialBeforeText = beforeTextIsMixed
+    ? ""
+    : numberFrom(formatting["before-text"], legacyBeforeText);
   const [alignment, setAlignment] = useState(
-    formatting.align === "mixed" ? "left" : (formatting.align ?? "left"),
+    formatting.align ?? "left",
   );
-  const [indentLevel, setIndentLevel] = useState(
-    Number(formatting["indent-level"] ?? 0),
-  );
+  const [beforeText, setBeforeText] = useState(initialBeforeText);
   const [before, setBefore] = useState(spacing.before);
   const [after, setAfter] = useState(spacing.after);
   const [lineSpacingMode, setLineSpacingMode] = useState(initialLineSpacingMode);
@@ -78,27 +100,35 @@ export default function ParagraphDialog({ formatting = {}, onApply, onClose }) {
 
   const apply = () => {
     const safeSpecialBy = Math.max(0, Number(specialBy) || 0);
-    const safeLineSpacing = Math.max(
-      0.5,
-      Number(getLineSpacingValueForMode(lineSpacingMode, lineSpacing)) || 1.15,
-    );
-    onApply?.({
-      align: alignment,
-      "indent-level": Math.max(0, Math.min(4, Number(indentLevel) || 0)),
-      margin: `${Math.max(0, Number(before) || 0)}px 0 ${Math.max(
+    const updates = {};
+
+    if (alignment !== "mixed") updates.align = alignment;
+    if (beforeText !== "")
+      updates["before-text"] = Math.max(0, Number(beforeText) || 0);
+    if (before !== "" && after !== "")
+      updates.margin = `${Math.max(0, Number(before) || 0)}px 0 ${Math.max(
         0,
         Number(after) || 0,
-      )}px 0`,
-      "line-spacing": String(safeLineSpacing),
-      "special-indent": specialIndentEnabled ? special : null,
-      "special-indent-by": specialIndentEnabled ? safeSpecialBy : null,
-      "text-indent":
+      )}px 0`;
+    if (lineSpacingMode !== "mixed") {
+      const safeLineSpacing = Math.max(
+        0.5,
+        Number(getLineSpacingValueForMode(lineSpacingMode, lineSpacing)) || 1.15,
+      );
+      updates["line-spacing"] = String(safeLineSpacing);
+    }
+    if (special !== "mixed") {
+      updates["special-indent"] = specialIndentEnabled ? special : "none";
+      updates["special-indent-by"] = specialIndentEnabled ? safeSpecialBy : 0;
+      updates["text-indent"] =
         special === "first-line"
           ? `${safeSpecialBy}px`
           : special === "hanging"
             ? `-${safeSpecialBy}px`
-            : null,
-    });
+            : "0px";
+    }
+
+    onApply?.(updates);
     onClose?.();
   };
 
@@ -130,6 +160,11 @@ export default function ParagraphDialog({ formatting = {}, onApply, onClose }) {
               value={alignment}
               onChange={(event) => setAlignment(event.target.value)}
             >
+              {alignment === "mixed" && (
+                <option value="mixed" disabled>
+                  Mixed
+                </option>
+              )}
               <option value="left">Left</option>
               <option value="center">Centered</option>
               <option value="right">Right</option>
@@ -146,10 +181,9 @@ export default function ParagraphDialog({ formatting = {}, onApply, onClose }) {
               <input
                 type="number"
                 min="0"
-                max="4"
                 step="1"
-                value={indentLevel}
-                onChange={(event) => setIndentLevel(event.target.value)}
+                value={beforeText}
+                onChange={(event) => setBeforeText(event.target.value)}
               />
             </label>
             <label>
@@ -158,6 +192,11 @@ export default function ParagraphDialog({ formatting = {}, onApply, onClose }) {
                 value={special}
                 onChange={(event) => setSpecial(event.target.value)}
               >
+                {special === "mixed" && (
+                  <option value="mixed" disabled>
+                    Mixed
+                  </option>
+                )}
                 <option value="none">(none)</option>
                 <option value="first-line">First line</option>
                 <option value="hanging">Hanging</option>
@@ -198,6 +237,11 @@ export default function ParagraphDialog({ formatting = {}, onApply, onClose }) {
                 value={lineSpacingMode}
                 onChange={(event) => handleLineSpacingModeChange(event.target.value)}
               >
+                {lineSpacingMode === "mixed" && (
+                  <option value="mixed" disabled>
+                    Mixed
+                  </option>
+                )}
                 <option value="single">Single</option>
                 <option value="one-and-half">1.5 lines</option>
                 <option value="double">Double</option>

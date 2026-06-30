@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import CanvasContextMenu from "./CanvasContextMenu";
 
 const renderMenu = (props = {}) =>
@@ -30,13 +30,13 @@ describe("CanvasContextMenu — canvas context", () => {
     expect(screen.getByText("Undo").closest("button")).not.toBeDisabled();
   });
 
-  test("calls onUndo and onClose when Undo is clicked", () => {
+  test("calls onUndo and onClose when Undo is clicked", async () => {
     const onUndo = vi.fn();
     const onClose = vi.fn();
     renderMenu({ contextType: "canvas", canUndo: true, onUndo, onClose });
     fireEvent.click(screen.getByText("Undo").closest("button"));
     expect(onUndo).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   test("does not show text-only search input", () => {
@@ -79,6 +79,51 @@ describe("CanvasContextMenu — text context", () => {
     });
     expect(screen.getByText("Font...")).toBeInTheDocument();
     expect(screen.queryByText("Paragraph...")).not.toBeInTheDocument();
+  });
+
+  test.each([
+    ["Use Destination Theme", "destination"],
+    ["Keep Source Formatting", "source"],
+    ["Keep Text Only", "text"],
+  ])("%s calls the matching text paste mode", async (label, mode) => {
+    const onPasteText = vi.fn().mockResolvedValue(true);
+    const onClose = vi.fn();
+    renderMenu({ contextType: "text", onPasteText, onClose });
+
+    fireEvent.click(screen.getByRole("button", { name: label }));
+
+    await waitFor(() =>
+      expect(onPasteText).toHaveBeenCalledWith(undefined, mode),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test("Picture calls the picture paste handler", async () => {
+    const onPastePicture = vi.fn().mockResolvedValue(true);
+    renderMenu({ contextType: "text", onPastePicture });
+
+    fireEvent.click(screen.getByRole("button", { name: "Picture" }));
+
+    await waitFor(() =>
+      expect(onPastePicture).toHaveBeenCalledWith(undefined),
+    );
+  });
+
+  test("keeps the menu open and reports unavailable clipboard content", async () => {
+    const onPasteText = vi.fn().mockResolvedValue(false);
+    const onClose = vi.fn();
+    renderMenu({ contextType: "text", onPasteText, onClose });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use Destination Theme" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Clipboard content is not available for this paste option.",
+      ),
+    ).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 

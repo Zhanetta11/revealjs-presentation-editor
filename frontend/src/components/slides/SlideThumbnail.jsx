@@ -6,6 +6,7 @@ import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,
   buildMediaFilterStyle,
+  buildMediaBorderOverlayStyle,
   buildBevelOverlayStyle,
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
@@ -38,6 +39,7 @@ function ThumbnailMedia({ media, index }) {
   const containerStyle = buildMediaContainerStyle(media, index);
   const innerStyle = buildMediaInnerStyle(media);
   const cssFilter = buildMediaFilterStyle(media);
+  const borderStyle = buildMediaBorderOverlayStyle(media);
   const bevelStyle = buildBevelOverlayStyle(media);
 
   const reflectionStyle = buildMediaReflectionStyle(media);
@@ -52,12 +54,14 @@ function ThumbnailMedia({ media, index }) {
     <>
       <div style={{ ...containerStyle, pointerEvents: "none" }}>
         {mediaEl}
+        {borderStyle && <div style={borderStyle} />}
         {bevelStyle && <div style={bevelStyle} />}
       </div>
       {reflectionStyle && !isVideo && (
         <div style={reflectionStyle} aria-hidden="true">
           <div style={reflectionContentStyle}>
             <img src={src} alt="" style={{ ...innerStyle, ...(cssFilter ? { filter: cssFilter } : {}) }} />
+            {borderStyle && <div style={borderStyle} />}
             {bevelStyle && <div style={bevelStyle} />}
           </div>
         </div>

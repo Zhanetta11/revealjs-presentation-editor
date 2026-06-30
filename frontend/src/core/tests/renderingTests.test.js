@@ -11,6 +11,7 @@ import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,
   buildMediaFilterStyle,
+  buildMediaBorderOverlayStyle,
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
   buildSlideContainerStyle,
@@ -262,8 +263,27 @@ describe("media effects and reflection styles", () => {
     expect(globalReflection?.height).toBe(240);
     expect(relativeReflection?.left).toBe(0);
     expect(relativeReflection?.top).toBe(240);
-    expect(reflectedFrame.border).toBe("10px solid #111827");
+    expect(reflectedFrame.border).toBeUndefined();
     expect(reflectedFrame.boxSizing).toBe("border-box");
+  });
+
+  it("renders picture borders as overlays without changing image layout", () => {
+    const framedMedia = {
+      width: 320,
+      height: 180,
+      effects: { "style-id": "thick-black" },
+    };
+    const container = buildMediaContainerStyle(framedMedia);
+    const image = buildMediaInnerStyle(framedMedia);
+    const border = buildMediaBorderOverlayStyle(framedMedia);
+
+    expect(container.width).toBe("320px");
+    expect(container.height).toBe("180px");
+    expect(container.border).toBeUndefined();
+    expect(image.width).toBe("100%");
+    expect(image.height).toBe("100%");
+    expect(border?.border).toBe("10px solid #111827");
+    expect(border?.boxSizing).toBe("border-box");
   });
 });
 

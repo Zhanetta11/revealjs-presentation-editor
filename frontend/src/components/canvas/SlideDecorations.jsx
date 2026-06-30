@@ -4,6 +4,7 @@ import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,
   buildMediaFilterStyle,
+  buildMediaBorderOverlayStyle,
   buildBevelOverlayStyle,
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
@@ -22,6 +23,7 @@ function MediaDecorationElement({ el, zIndex, interactive = false, onPromote }) 
   const innerStyle = buildMediaInnerStyle(el);
   const cssFilter = buildMediaFilterStyle(el);
   const filteredInnerStyle = cssFilter ? { ...innerStyle, filter: cssFilter } : innerStyle;
+  const borderStyle = buildMediaBorderOverlayStyle(el);
   const bevelStyle = buildBevelOverlayStyle(el);
   const reflectionStyle = buildMediaReflectionStyle(el);
   const reflectionContentStyle = buildMediaReflectionContentStyle(el);
@@ -48,12 +50,14 @@ function MediaDecorationElement({ el, zIndex, interactive = false, onPromote }) 
             </div>
           </div>
         )}
+        {borderStyle && <div style={borderStyle} />}
         {bevelStyle && <div style={bevelStyle} />}
       </div>
       {!isVideo && reflectionStyle && (
         <div style={{ ...reflectionStyle, zIndex: zIndex ?? 5 }} aria-hidden="true">
           <div style={reflectionContentStyle}>
             <img src={src} alt="" style={filteredInnerStyle} />
+            {borderStyle && <div style={borderStyle} />}
             {bevelStyle && <div style={bevelStyle} />}
           </div>
         </div>

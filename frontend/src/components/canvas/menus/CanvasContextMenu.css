@@ -102,6 +102,14 @@
   line-height: 1;
 }
 
+.canvas-context-paste-error {
+  max-width: 235px;
+  padding: 0 12px 8px 43px;
+  color: #b42318;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .canvas-context-menu-item:hover:not(:disabled),
 .canvas-context-menu-item:focus-visible:not(:disabled) {
   background: #e9f2fb;

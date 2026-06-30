@@ -13,6 +13,7 @@ import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,
   buildMediaFilterStyle,
+  buildMediaBorderOverlayStyle,
   buildBevelOverlayStyle,
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
@@ -145,14 +146,11 @@ function applyFragment(innerHtml, wrapperStyle, animation) {
 }
 
 export function buildPStyle(paragraphFormatting, listPaddingLeft = null) {
-  const indent = paragraphFormatting["indent-level"] ?? 0;
-  const paddingLeft = listPaddingLeft
-    ?? (indent > 0 ? getListIndent(indent - 1, "indent") : null);
   const indentStyles = resolveParagraphIndentStyles(
     paragraphFormatting,
     {},
     {},
-    paddingLeft,
+    listPaddingLeft,
   );
   return [
     paragraphFormatting.size ? `font-size: ${paragraphFormatting.size}` : "",
@@ -245,8 +243,10 @@ function buildReflectionHtml(media, src) {
     ...(cssFilter ? { filter: cssFilter } : {}),
   };
   const bevelStyle = buildBevelOverlayStyle(media);
+  const borderStyle = buildMediaBorderOverlayStyle(media);
+  const borderHtml = borderStyle ? `<div style="${styleToString(borderStyle)}"></div>` : "";
   const bevelHtml = bevelStyle ? `<div style="${styleToString(bevelStyle)}"></div>` : "";
-  return `<div aria-hidden="true" style="${styleToString(reflectionStyle)}"><div style="${styleToString(contentStyle)}"><img src="${escapeHtml(src)}" alt="" style="${styleToString(imageStyle)}" />${bevelHtml}</div></div>`;
+  return `<div aria-hidden="true" style="${styleToString(reflectionStyle)}"><div style="${styleToString(contentStyle)}"><img src="${escapeHtml(src)}" alt="" style="${styleToString(imageStyle)}" />${borderHtml}${bevelHtml}</div></div>`;
 }
 
 function buildMasterElementsHtml(presentation, masterFormatting, getSrc) {
@@ -275,11 +275,13 @@ function buildMasterElementsHtml(presentation, masterFormatting, getSrc) {
       ? `<video src="${escapeHtml(src)}" style="${innerStyle}" preload="metadata"${autoPlay ? " autoplay" : ""}${loop ? " loop" : ""}${muted ? " muted" : ""}${showControls ? " controls" : ""}></video>`
       : `<img src="${escapeHtml(src)}" alt="${escapeHtml(media.decorative ? "" : (media.alt ?? ""))}" style="${innerStyle}" />`;
 
+    const borderStyle = buildMediaBorderOverlayStyle(media);
+    const borderHtml = borderStyle ? `<div style="${styleToString(borderStyle)}"></div>` : "";
     const bevelStyle = buildBevelOverlayStyle(media);
     const bevelHtml = bevelStyle ? `<div style="${styleToString(bevelStyle)}"></div>` : "";
     const reflectionHtml = isVideo ? "" : buildReflectionHtml(media, src);
 
-    return `<div style="${wrapperStyle}">${inner}${bevelHtml}</div>${reflectionHtml}`;
+    return `<div style="${wrapperStyle}">${inner}${borderHtml}${bevelHtml}</div>${reflectionHtml}`;
   }).join("");
 
   return textsHtml + mediaHtml;
@@ -357,11 +359,13 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
         ? `<video src="${escapeHtml(src)}" style="${innerStyle}" preload="metadata"${autoPlay ? " autoplay" : ""}${loop ? " loop" : ""}${muted ? " muted" : ""}${showControls ? " controls" : ""}></video>`
         : `<img src="${escapeHtml(src)}" alt="${escapeHtml(media.decorative ? "" : (media.alt ?? ""))}" style="${innerStyle}" />`;
 
+      const borderStyle = buildMediaBorderOverlayStyle(media);
+      const borderHtml = borderStyle ? `<div style="${styleToString(borderStyle)}"></div>` : "";
       const bevelStyle = buildBevelOverlayStyle(media);
       const bevelHtml = bevelStyle ? `<div style="${styleToString(bevelStyle)}"></div>` : "";
       const reflectionHtml = isVideo ? "" : buildReflectionHtml(media, src);
 
-      const innerHtml = `${mediaHtml}${bevelHtml}`;
+      const innerHtml = `${mediaHtml}${borderHtml}${bevelHtml}`;
       const adjustedMediaAnim = animation && adjustedSeqMap.has(animation.id)
         ? { ...animation, sequence: adjustedSeqMap.get(animation.id) }
         : animation;

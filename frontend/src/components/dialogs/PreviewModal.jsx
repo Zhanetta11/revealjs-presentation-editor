@@ -10,6 +10,7 @@ import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,
   buildMediaFilterStyle,
+  buildMediaBorderOverlayStyle,
   buildBevelOverlayStyle,
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
@@ -62,6 +63,7 @@ function PreviewMediaElement({ media, index, fragmentProps }) {
   const innerStyle = buildMediaInnerStyle(media);
   const cssFilter = buildMediaFilterStyle(media);
   const filteredInnerStyle = cssFilter ? { ...innerStyle, filter: cssFilter } : innerStyle;
+  const borderStyle = buildMediaBorderOverlayStyle(media);
   const bevelStyle = buildBevelOverlayStyle(media);
   const reflectionStyle = buildMediaReflectionStyle(media);
   const reflectionContentStyle = buildMediaReflectionContentStyle(media);
@@ -75,12 +77,14 @@ function PreviewMediaElement({ media, index, fragmentProps }) {
         ) : (
           <img src={src} alt="" style={filteredInnerStyle} />
         )}
+        {borderStyle && <div style={borderStyle} />}
         {bevelStyle && <div style={bevelStyle} />}
       </div>
       {!isVideo && reflectionStyle && src && (
         <div style={reflectionStyle} aria-hidden="true">
           <div style={reflectionContentStyle}>
             <img src={src} alt="" style={filteredInnerStyle} />
+            {borderStyle && <div style={borderStyle} />}
             {bevelStyle && <div style={bevelStyle} />}
           </div>
         </div>

@@ -19,7 +19,7 @@ import {
   createImageMediaElement,
   createVideoMediaElement,
 } from "../core/operations/mediaOperations";
-import { getPresentationTitle, createParagraphId } from "../core/utils/presentationUtils";
+import { getPresentationTitle } from "../core/utils/presentationUtils";
 import { getSlideTransition } from "../core/model/transitionDefaults";
 import { importPresentationFromJson } from "../core/persistence/importPresentation";
 import { createTextElementDefaults } from "../core/model/masterDefaults";
@@ -39,20 +39,11 @@ import {
   downloadPresentationAsJson,
   storeMediaFile,
 } from "../core/persistence/persistenceFacade";
-
-const PASTE_RUN_KEYS = new Set([
-  "weight",
-  "italics",
-  "text-decoration",
-  "color",
-  "size",
-  "font",
-  "super-sub-script",
-  "highlight",
-]);
-
-const paragraphTextLength = (paragraph) =>
-  (paragraph?.runs ?? []).reduce((sum, run) => sum + (run.text?.length ?? 0), 0);
+import {
+  htmlToClipboardParagraphs,
+  insertClipboardParagraphs,
+  plainTextToClipboardParagraphs,
+} from "../core/text/clipboardText";
 
 const paragraphText = (paragraph) =>
   (paragraph?.runs ?? []).map((run) => run.text ?? "").join("");
@@ -95,64 +86,6 @@ const getSelectedPlainText = (textElement, selection) => {
   return lines.join("\n");
 };
 
-const sliceRuns = (runs = [], start, end) => {
-  const result = [];
-  let offset = 0;
-  for (const run of runs) {
-    const text = run.text ?? "";
-    const runStart = offset;
-    const runEnd = offset + text.length;
-    const from = Math.max(start, runStart);
-    const to = Math.min(end, runEnd);
-    if (to > from) {
-      result.push({
-        ...run,
-        text: text.slice(from - runStart, to - runStart),
-      });
-    }
-    offset = runEnd;
-  }
-  return result;
-};
-
-const mergeRuns = (runs) => {
-  const merged = [];
-  for (const run of runs.filter(Boolean)) {
-    if (run.text === "" && runs.length > 1) continue;
-    const previous = merged.at(-1);
-    if (
-      previous &&
-      JSON.stringify(previous.formatting ?? {}) ===
-        JSON.stringify(run.formatting ?? {}) &&
-      JSON.stringify(previous.link ?? null) === JSON.stringify(run.link ?? null) &&
-      previous["super-sub-script"] === run["super-sub-script"]
-    ) {
-      previous.text += run.text ?? "";
-    } else {
-      merged.push(run);
-    }
-  }
-  return merged.length
-    ? merged
-    : [{ text: "", formatting: {}, "super-sub-script": "normal", link: null }];
-};
-
-const buildPasteRun = (text, formatting = {}) => {
-  const runFormatting = Object.fromEntries(
-    Object.entries(formatting).filter(
-      ([key, value]) => PASTE_RUN_KEYS.has(key) && value !== "mixed",
-    ),
-  );
-  const superSubScript = runFormatting["super-sub-script"] ?? "normal";
-  delete runFormatting["super-sub-script"];
-  return {
-    text,
-    formatting: runFormatting,
-    "super-sub-script": superSubScript,
-    link: null,
-  };
-};
-
 const readImageDimensionsFromFile = (file) =>
   new Promise((resolve) => {
     const url = URL.createObjectURL(file);
@@ -179,113 +112,136 @@ const fitImageToSlide = (width, height, slideWidth, slideHeight) => {
   };
 };
 
-const insertPlainTextIntoParagraphs = (
+const readClipboardPayload = async () => {
+  const payload = { text: "", html: "", imageBlob: null, imageType: "" };
+  try {
+    const items = await navigator.clipboard?.read?.();
+    for (const item of items ?? []) {
+      if (!payload.imageBlob) {
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+        if (imageType) {
+          payload.imageBlob = await item.getType(imageType);
+          payload.imageType = imageType;
+        }
+      }
+      if (!payload.html && item.types.includes("text/html"))
+        payload.html = await (await item.getType("text/html")).text();
+      if (!payload.text && item.types.includes("text/plain"))
+        payload.text = await (await item.getType("text/plain")).text();
+    }
+  } catch {
+  }
+  if (!payload.text) {
+    try {
+      payload.text = (await navigator.clipboard?.readText?.()) ?? "";
+    } catch {
+    }
+  }
+  return payload;
+};
+
+const renderClipboardParagraphsToPngFile = async (
   paragraphs,
-  selection,
-  text,
-  formatting,
+  fallbackFormatting = {},
 ) => {
-  const sourceParagraphs = structuredClone(paragraphs ?? []);
-  if (!sourceParagraphs.length || !selection || !text) return null;
+  if (!paragraphs?.length) return null;
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const padding = 20;
+  const lineGap = 6;
+  const lines = paragraphs.map((paragraph) => {
+    const runs = paragraph.runs?.length
+      ? paragraph.runs
+      : [{ text: "", formatting: {} }];
+    const measured = runs.map((run) => {
+      const formatting = { ...fallbackFormatting, ...(run.formatting ?? {}) };
+      const size = Math.max(8, Number.parseFloat(formatting.size) || 24);
+      const font = formatting.font || "Arial";
+      const weight =
+        formatting.weight === true || formatting.weight === "bold"
+          ? "bold"
+          : formatting.weight || "normal";
+      const italics =
+        formatting.italics === true || formatting.italics === "italic"
+          ? "italic"
+          : "normal";
+      const fontSpec = `${italics} ${weight} ${size}px ${font}`;
+      context.font = fontSpec;
+      return {
+        run,
+        formatting,
+        size,
+        fontSpec,
+        width: context.measureText(run.text ?? "").width,
+      };
+    });
+    return {
+      runs: measured,
+      width: measured.reduce((sum, entry) => sum + entry.width, 0),
+      height: Math.max(...measured.map((entry) => entry.size * 1.3), 24),
+    };
+  });
 
-  const startParagraphIdx = Math.min(
-    selection.paragraphIdx,
-    selection.endParagraphIdx ?? selection.paragraphIdx,
+  canvas.width = Math.max(
+    1,
+    Math.ceil(Math.max(...lines.map((line) => line.width), 1) + padding * 2),
   );
-  const endParagraphIdx = Math.max(
-    selection.paragraphIdx,
-    selection.endParagraphIdx ?? selection.paragraphIdx,
+  canvas.height = Math.max(
+    1,
+    Math.ceil(
+      lines.reduce((sum, line) => sum + line.height, 0) +
+        lineGap * Math.max(0, lines.length - 1) +
+        padding * 2,
+    ),
   );
-  const startOffset =
-    startParagraphIdx === selection.paragraphIdx
-      ? selection.rangeStart
-      : selection.rangeEnd;
-  const endOffset =
-    endParagraphIdx === (selection.endParagraphIdx ?? selection.paragraphIdx)
-      ? selection.rangeEnd
-      : selection.rangeStart;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.textBaseline = "alphabetic";
 
-  const startParagraph = sourceParagraphs[startParagraphIdx];
-  const endParagraph = sourceParagraphs[endParagraphIdx];
-  if (!startParagraph || !endParagraph) return null;
+  let y = padding;
+  for (const line of lines) {
+    let x = padding;
+    const baseline = y + line.height * 0.82;
+    for (const entry of line.runs) {
+      context.font = entry.fontSpec;
+      if (
+        entry.formatting.highlight &&
+        entry.formatting.highlight !== "transparent"
+      ) {
+        context.fillStyle = entry.formatting.highlight;
+        context.fillRect(x, y, entry.width, line.height);
+      }
+      context.fillStyle = entry.formatting.color || "#000000";
+      context.fillText(entry.run.text ?? "", x, baseline);
+      const decoration = entry.formatting["text-decoration"] ?? "";
+      context.strokeStyle = context.fillStyle;
+      context.lineWidth = Math.max(1, entry.size / 18);
+      if (decoration.includes("underline")) {
+        context.beginPath();
+        context.moveTo(x, baseline + entry.size * 0.1);
+        context.lineTo(x + entry.width, baseline + entry.size * 0.1);
+        context.stroke();
+      }
+      if (decoration.includes("line-through")) {
+        context.beginPath();
+        context.moveTo(x, baseline - entry.size * 0.3);
+        context.lineTo(x + entry.width, baseline - entry.size * 0.3);
+        context.stroke();
+      }
+      x += entry.width;
+    }
+    y += line.height + lineGap;
+  }
 
-  const safeStartOffset = Math.max(
-    0,
-    Math.min(startOffset, paragraphTextLength(startParagraph)),
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/png"),
   );
-  const safeEndOffset = Math.max(
-    0,
-    Math.min(endOffset, paragraphTextLength(endParagraph)),
-  );
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
-  const beforeRuns = sliceRuns(
-    startParagraph.runs,
-    0,
-    Math.min(safeStartOffset, paragraphTextLength(startParagraph)),
-  );
-  const afterRuns = sliceRuns(
-    endParagraph.runs,
-    Math.max(safeEndOffset, 0),
-    paragraphTextLength(endParagraph),
-  );
-
-  const makeInsertedRuns = (line) =>
-    line ? [buildPasteRun(line, formatting)] : [];
-
-  const replacementParagraphs =
-    lines.length === 1
-      ? [
-          {
-            ...startParagraph,
-            runs: mergeRuns([
-              ...beforeRuns,
-              ...makeInsertedRuns(lines[0]),
-              ...afterRuns,
-            ]),
-          },
-        ]
-      : lines.map((line, index) => {
-          if (index === 0) {
-            return {
-              ...startParagraph,
-              runs: mergeRuns([...beforeRuns, ...makeInsertedRuns(line)]),
-            };
-          }
-          if (index === lines.length - 1) {
-            return {
-              ...endParagraph,
-              id: createParagraphId(),
-              formatting: { ...(startParagraph.formatting ?? {}) },
-              runs: mergeRuns([...makeInsertedRuns(line), ...afterRuns]),
-            };
-          }
-          return {
-            ...startParagraph,
-            id: createParagraphId(),
-            runs: mergeRuns(makeInsertedRuns(line)),
-          };
-        });
-
-  const nextParagraphs = [
-    ...sourceParagraphs.slice(0, startParagraphIdx),
-    ...replacementParagraphs,
-    ...sourceParagraphs.slice(endParagraphIdx + 1),
-  ];
-  const cursorParagraphIdx = startParagraphIdx + lines.length - 1;
-  const cursorOffset =
-    lines.length === 1
-      ? safeStartOffset + lines[0].length
-      : lines.at(-1).length;
-
-  return {
-    paragraphs: nextParagraphs,
-    selection: {
-      paragraphIdx: cursorParagraphIdx,
-      rangeStart: cursorOffset,
-      endParagraphIdx: cursorParagraphIdx,
-      rangeEnd: cursorOffset,
-    },
-  };
+  return blob
+    ? {
+        file: new File([blob], "clipboard-text.png", { type: "image/png" }),
+        naturalSize: { width: canvas.width, height: canvas.height },
+      }
+    : null;
 };
 
 export function useEditorController() {
@@ -1003,29 +959,68 @@ useEffect(() => {
         targetId === selectedTextEl?.id
           ? selectedTextEl
           : (selectedSlide?.contents?.text ?? []).find((el) => el.id === targetId);
-      const selection = activeSelectionRef.current;
-      if (!targetId || !textElement || selection?.elementId !== targetId) {
-        pasteElement();
-        return false;
-      }
+      if (!targetId || !textElement) return false;
+      const activeSelection = activeSelectionRef.current;
+      const lastParagraphIdx = Math.max(
+        0,
+        (textElement.paragraphs?.length ?? 1) - 1,
+      );
+      const lastOffset = paragraphText(
+        textElement.paragraphs?.[lastParagraphIdx],
+      ).length;
+      const selection =
+        activeSelection?.elementId === targetId
+          ? activeSelection
+          : {
+              elementId: targetId,
+              paragraphIdx: lastParagraphIdx,
+              rangeStart: lastOffset,
+              endParagraphIdx: lastParagraphIdx,
+              rangeEnd: lastOffset,
+            };
 
-      let clipboardText = "";
-      try {
-        clipboardText = await navigator.clipboard?.readText?.();
-      } catch (error) {
-        console.warn("[EditorPage] Clipboard text paste failed:", error);
-      }
+      const payload = await readClipboardPayload();
+      const internalClipboard = Array.isArray(state.clipboard)
+        ? state.clipboard
+        : state.clipboard
+          ? [state.clipboard]
+          : [];
+      const internalText = internalClipboard.find(
+        (element) => element["media-type"] === undefined,
+      );
+      const htmlParagraphs = payload.html
+        ? htmlToClipboardParagraphs(payload.html)
+        : [];
+      const htmlPlainText = htmlParagraphs
+        .map((paragraph) => paragraphText(paragraph))
+        .join("\n");
+      const internalPlainText = (internalText?.paragraphs ?? [])
+        .map((paragraph) => paragraphText(paragraph))
+        .join("\n");
+      const clipboardText =
+        payload.text || htmlPlainText || internalPlainText;
 
-      if (!clipboardText) {
-        pasteElement();
-        return false;
+      let clipboardParagraphs = [];
+      if (mode === "source" && htmlParagraphs.length)
+        clipboardParagraphs = htmlParagraphs;
+      if (
+        mode === "source" &&
+        clipboardParagraphs.length === 0 &&
+        internalText?.paragraphs?.length
+      )
+        clipboardParagraphs = structuredClone(internalText.paragraphs);
+      if (clipboardParagraphs.length === 0 && clipboardText) {
+        clipboardParagraphs = plainTextToClipboardParagraphs(
+          clipboardText,
+          mode === "text" ? {} : currentFormatting,
+        );
       }
+      if (clipboardParagraphs.length === 0) return false;
 
-      const result = insertPlainTextIntoParagraphs(
+      const result = insertClipboardParagraphs(
         textElement.paragraphs,
         selection,
-        clipboardText,
-        mode === "text" ? {} : currentFormatting,
+        clipboardParagraphs,
       );
       if (!result) return false;
 
@@ -1033,7 +1028,7 @@ useEffect(() => {
         selectedSlideIndex,
         targetId,
         result.paragraphs,
-        true,
+        false,
       );
       const nextSelection = { elementId: targetId, ...result.selection };
       activeSelectionRef.current = nextSelection;
@@ -1048,7 +1043,7 @@ useEffect(() => {
       currentFormatting,
       updateTextElementParagraphs,
       selectedSlideIndex,
-      pasteElement,
+      state.clipboard,
     ],
   );
 
@@ -1065,12 +1060,6 @@ useEffect(() => {
       if (!layoutId) return null;
       const layout = (presentation?.slideset?.layouts ?? []).find((l) => l["layout-id"] === layoutId);
       const layoutTexts = layout?.elements?.text ?? [];
-      const master = presentation?.slideset?.master;
-      const masterTexts = master?.elements?.text ?? [];
-      console.log("[PastePicture:debug] slide layout-id:", layoutId);
-      console.log("[PastePicture:debug] layoutTexts:", layoutTexts.map(t => ({ id: t.id, pos: t.position, w: t.width, h: t.height, text: t.paragraphs?.[0]?.runs?.[0]?.text })));
-      console.log("[PastePicture:debug] masterTexts:", masterTexts.map(t => ({ id: t.id, pos: t.position, w: t.width, h: t.height, text: t.paragraphs?.[0]?.runs?.[0]?.text })));
-      console.log("[PastePicture:debug] slide contents.text:", (selectedSlide?.contents?.text ?? []).map(t => ({ id: t.id, hidden: t.hidden, pid: t["placeholder-id"], text: t.paragraphs?.[0]?.runs?.[0]?.text })));
       const ex = el.position?.x ?? 0, ey = el.position?.y ?? 0;
       const ew = el.width ?? 300, eh = el.height ?? 80;
       const match = layoutTexts.find((lt) => {
@@ -1103,8 +1092,6 @@ useEffect(() => {
         const phH = targetEl.height ?? naturalSize.height;
         const phPos = targetEl.position ?? { x: 60, y: 60 };
         const { width: fitW, height: fitH } = scaleToPlaceholder(naturalSize.width, naturalSize.height, phW, phH);
-        const pid = findOverlappingLayoutTextId(targetEl);
-        console.log("[PastePicture:OS] targetEl.id:", targetEl.id, "placeholder-id override:", pid, "image size:", fitW, "x", fitH, "at:", phPos);
         beginHistory();
         addMedia(buildImageProps({
           ...createImageMediaElement(mediaId, key, { width: fitW, height: fitH }),
@@ -1113,9 +1100,7 @@ useEffect(() => {
           "source-height": naturalSize.height,
           "z-index": targetEl["z-index"] ?? 1,
         }));
-        console.log("[PastePicture:OS] calling updateElement hidden on:", targetEl.id);
         updateElement(targetEl.id, { hidden: true });
-        console.log("[PastePicture:OS] updateElement called, committing history");
         commitHistory();
       } else {
         const displaySize = fitImageToSlide(naturalSize.width, naturalSize.height, slideWidth, slideHeight);
@@ -1133,8 +1118,6 @@ useEffect(() => {
       const phH = targetEl.height ?? internalMedia.height ?? 200;
       const phPos = targetEl.position ?? { x: 60, y: 60 };
       const { width: fitW, height: fitH } = scaleToPlaceholder(internalMedia.width ?? phW, internalMedia.height ?? phH, phW, phH);
-      const pid = findOverlappingLayoutTextId(targetEl);
-      console.log("[PastePicture:internal] targetEl.id:", targetEl.id, "placeholder-id override:", pid, "image size:", fitW, "x", fitH);
       beginHistory();
       addMedia(buildImageProps({
         ...structuredClone(internalMedia),
@@ -1144,9 +1127,7 @@ useEffect(() => {
         height: fitH,
         "z-index": targetEl["z-index"] ?? 1,
       }));
-      console.log("[PastePicture:internal] calling updateElement hidden on:", targetEl.id);
       updateElement(targetEl.id, { hidden: true });
-      console.log("[PastePicture:internal] updateElement called, committing history");
       commitHistory();
       return true;
     }
@@ -1157,30 +1138,50 @@ useEffect(() => {
     }
 
     try {
-      const clipboardItems = await navigator.clipboard?.read?.();
-      const imageItem = clipboardItems?.find((item) =>
-        item.types.some((type) => type.startsWith("image/")),
-      );
-      const imageType = imageItem?.types.find((type) =>
-        type.startsWith("image/"),
-      );
-      if (!imageItem || !imageType) return false;
+      const payload = await readClipboardPayload();
+      if (payload.imageBlob) {
+        const file = new File(
+          [payload.imageBlob],
+          `clipboard-image.${payload.imageType.split("/")[1] ?? "png"}`,
+          { type: payload.imageType },
+        );
+        const [{ mediaId, key }, naturalSize] = await Promise.all([
+          storeMediaFile(file),
+          readImageDimensionsFromFile(file),
+        ]);
+        await placeImageAtTarget(mediaId, key, naturalSize);
+        return true;
+      }
 
-      const blob = await imageItem.getType(imageType);
-      const file = new File([blob], `clipboard-image.${imageType.split("/")[1] ?? "png"}`, {
-        type: imageType,
-      });
-      const [{ mediaId, key }, naturalSize] = await Promise.all([
-        storeMediaFile(file),
-        readImageDimensionsFromFile(file),
-      ]);
-      await placeImageAtTarget(mediaId, key, naturalSize);
+      const internalText = internalClipboard.find(
+        (element) => element["media-type"] === undefined,
+      );
+      let clipboardParagraphs = payload.html
+        ? htmlToClipboardParagraphs(payload.html)
+        : [];
+      if (
+        clipboardParagraphs.length === 0 &&
+        internalText?.paragraphs?.length
+      )
+        clipboardParagraphs = structuredClone(internalText.paragraphs);
+      if (clipboardParagraphs.length === 0 && payload.text)
+        clipboardParagraphs = plainTextToClipboardParagraphs(
+          payload.text,
+          currentFormatting,
+        );
+      const rendered = await renderClipboardParagraphsToPngFile(
+        clipboardParagraphs,
+        currentFormatting,
+      );
+      if (!rendered) return false;
+      const { mediaId, key } = await storeMediaFile(rendered.file);
+      await placeImageAtTarget(mediaId, key, rendered.naturalSize);
       return true;
     } catch (error) {
       console.warn("[EditorPage] Clipboard picture paste failed:", error);
       return false;
     }
-  }, [state.clipboard, pasteElement, addMedia, updateElement, beginHistory, commitHistory, presentation, selectedSlide, selectedTextEl, slideWidth, slideHeight]);
+  }, [state.clipboard, pasteElement, addMedia, updateElement, beginHistory, commitHistory, presentation, selectedSlide, selectedTextEl, slideWidth, slideHeight, currentFormatting]);
 
   const handlePlaceholderImageUpload = useCallback(
     async (placeholderElement, file) => {

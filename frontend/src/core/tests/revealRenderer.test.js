@@ -120,6 +120,16 @@ describe("buildPStyle", () => {
     expect(style).toContain("padding-left: 2em");
   });
 
+  it("uses the same Before text indentation as the editor renderer", () => {
+    const style = buildPStyle({ "before-text": 36 });
+    expect(style).toContain("padding-left: 36px");
+  });
+
+  it("keeps legacy non-list indent levels compatible", () => {
+    const style = buildPStyle({ "indent-level": 2 });
+    expect(style).toContain("padding-left: 48px");
+  });
+
   it("produces no font-size when size is not set", () => {
     const style = buildPStyle({ align: "left" });
     expect(style).not.toContain("font-size");

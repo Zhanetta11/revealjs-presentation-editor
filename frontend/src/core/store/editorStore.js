@@ -683,8 +683,8 @@ export const editorReducer = (state, event) => {
         lastUpdated: Date.now(),
       });
 
-    case EditorEventType.ELEMENT.UPDATE:
-      return withHistory(state, {
+    case EditorEventType.ELEMENT.UPDATE: {
+      const nextState = {
         ...state,
         presentation: updateElement(
           state.presentation,
@@ -694,7 +694,9 @@ export const editorReducer = (state, event) => {
         ),
         lastEvent: event,
         lastUpdated: Date.now(),
-      });
+      };
+      return state.pendingSnapshot ? nextState : withHistory(state, nextState);
+    }
 
     case EditorEventType.ELEMENT.UPDATE_SILENT:
       return {
@@ -743,8 +745,8 @@ export const editorReducer = (state, event) => {
       });
     }
 
-    case EditorEventType.MEDIA.ADD:
-      return withHistory(state, {
+    case EditorEventType.MEDIA.ADD: {
+      const nextState = {
         ...state,
         presentation: addMedia(
           state.presentation,
@@ -755,7 +757,9 @@ export const editorReducer = (state, event) => {
         selectedElementIds: [event.payload.mediaElement.id],
         lastEvent: event,
         lastUpdated: Date.now(),
-      });
+      };
+      return state.pendingSnapshot ? nextState : withHistory(state, nextState);
+    }
 
     case EditorEventType.MEDIA.DELETE:
       return withHistory(state, {

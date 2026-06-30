@@ -34,19 +34,24 @@ Icons are already generated in `public/icons/`:
 
 ```
 frontend/
+├── doc/
+│   └── electron/           # This documentation
 ├── electron/
-│   ├── main.cjs              # Main process (Node.js)
-│   ├── preload.cjs           # Security bridge
-│   └── entitlements.plist    # macOS code signing
+│   ├── main.cjs            # Main process (Node.js)
+│   ├── preload.cjs         # Security bridge
+│   ├── config.cjs          # Configuration management
+│   ├── logger.cjs          # Logging system
+│   ├── devtools.cjs        # Development utilities
+│   ├── performance.cjs     # Performance monitoring
+│   └── entitlements.plist  # macOS code signing
 ├── public/icons/
-│   ├── icon.png              # Linux AppImage
-│   ├── icon.ico              # Windows NSIS/MSI/Portable
-│   ├── icon.icns             # macOS DMG
-│   └── icon.svg              # Source vector
-├── src/                       # React application
+│   ├── icon.png            # Linux AppImage
+│   ├── icon.ico            # Windows NSIS/MSI/Portable
+│   ├── icon.icns           # macOS DMG
+│   └── icon.svg            # Source vector
+├── src/                    # React application
 ├── electron-builder.config.js # Build configuration
-├── package.json              # Scripts and dependencies
-└── ELECTRON_SETUP.md         # This file
+└── package.json
 ```
 
 ## Configuration Files
@@ -63,11 +68,22 @@ frontend/
 - Drag & drop file handling
 - IPC message handlers for React communication
 - Error handling and crash recovery
+- Logging of all important events
 
 ### electron/preload.cjs
 - Security isolation (contextIsolation: true)
 - Exposes safe IPC API to React via `window.electronAPI`
 - No direct Node.js access from renderer
+
+### electron/config.cjs
+- Persistent application configuration
+- Automatic schema validation
+- Settings stored in `userData/config.json`
+
+### electron/logger.cjs
+- Automatic logging to `userData/logs/app-YYYY-MM-DD.log`
+- Log levels: INFO, WARN, ERROR, DEBUG
+- Console output in development mode
 
 ### electron/entitlements.plist
 - macOS code signing entitlements
@@ -80,31 +96,42 @@ frontend/
 From React, use `window.electronAPI`:
 
 ```javascript
+// File operations
 const filePaths = await electronAPI.openFile()
 const savePath = await electronAPI.saveFile('filename.json')
 const content = await electronAPI.readFile(filePath)
 await electronAPI.writeFile(filePath, jsonContent)
 
+// Dialogs
 await electronAPI.showError('Error Title', 'Error message')
 await electronAPI.showMessage('Info Title', 'Info message')
 
+// Menu events
 electronAPI.onMenuNew(callback)
 electronAPI.onMenuOpen(callback)
 electronAPI.onMenuSave(callback)
 electronAPI.onMenuSaveAs(callback)
 
+// File drop
 electronAPI.onFileDrop((filePath) => {
-  
+  // Handle dropped file
 })
 
+// App info
 const appPath = await electronAPI.getAppPath()
 const version = await electronAPI.getVersion()
 
+// Configuration
 const theme = await electronAPI.getConfig('theme')
 await electronAPI.setConfig('theme', 'dark')
 await electronAPI.setConfig('autoSave', true)
 
+// Logging
 const logsDir = await electronAPI.getLogsDir()
+
+// Development (dev mode only)
+const metrics = await electronAPI.getDevMetrics()
+const memory = await electronAPI.getMemoryInfo()
 ```
 
 ## Configuration System
@@ -114,11 +141,20 @@ Application settings are automatically persisted to `userData/config.json`:
 ```javascript
 // Available settings
 {
-  theme: 'light',              // 'light' or 'dark'
-  language: 'en',
-  autoSave: true,
-  autoSaveInterval: 60000,     // milliseconds
-  recentFiles: []              // array of file paths
+  windowState: {
+    width: 1280,
+    height: 720,
+    x: undefined,
+    y: undefined,
+    isMaximized: false
+  },
+  appSettings: {
+    theme: 'light',              // 'light' or 'dark'
+    language: 'en',
+    autoSave: true,
+    autoSaveInterval: 60000,     // milliseconds
+    recentFiles: []              // array of file paths
+  }
 }
 ```
 
@@ -170,6 +206,8 @@ const logsDir = await window.electronAPI.getLogsDir()
 npm run build
 npm run dev:electron
 ```
+
+See [DEVELOPER.md](DEVELOPER.md#debugging) for debugging tips.
 
 ## Building for Production
 
@@ -223,6 +261,11 @@ npm run build:linux
 - Delete `node_modules` and `package-lock.json`
 - Run `npm install` again
 
+**Memory or performance issues**
+- Check logs: `userData/logs/app-YYYY-MM-DD.log`
+- Use `getDevMetrics()` and `getMemoryInfo()` in dev mode
+- See [Performance Optimization](DEVELOPER.md#performance-optimization)
+
 ## Integration with React
 
 The React app can use `window.electronAPI` in any component:
@@ -251,7 +294,6 @@ export function FileOpener() {
 - [electron-builder](https://www.electron.build/)
 - [IPC Main Process](https://www.electronjs.org/docs/latest/api/ipc-main)
 - [Preload Scripts](https://www.electronjs.org/docs/latest/tutorial/tutorial-preload)
+- [Developer Guide](DEVELOPER.md)
 
 ---
-
-**Production Ready**: This setup follows Electron security best practices and is ready for distribution.

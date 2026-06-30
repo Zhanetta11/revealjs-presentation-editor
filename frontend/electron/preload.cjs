@@ -23,4 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setConfig: (key, value) => ipcRenderer.invoke('config:set', key, value),
 
   getLogsDir: () => ipcRenderer.invoke('logs:getDir'),
+
+  getDevMetrics: () => ipcRenderer.invoke('devtools:getMetrics'),
+  getMemoryInfo: () => ipcRenderer.invoke('devtools:getMemory'),
 });

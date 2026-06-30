@@ -4,6 +4,7 @@ const isDev = require('electron-is-dev');
 const fs = require('fs');
 const logger = require('./logger.cjs');
 const config = require('./config.cjs');
+const devtools = isDev ? require('./devtools.cjs') : null;
 
 let mainWindow;
 
@@ -109,6 +110,10 @@ function createWindow() {
 
 app.on('ready', () => {
   logger.info('App ready', { version: app.getVersion() });
+  if (devtools) {
+    devtools.logEnvironmentInfo();
+    devtools.checkSetup(app);
+  }
   createWindow();
 });
 
@@ -361,3 +366,13 @@ ipcMain.handle('config:set', (event, key, value) => {
 ipcMain.handle('logs:getDir', () => {
   return logger.getLogsDir();
 });
+
+if (isDev && devtools) {
+  ipcMain.handle('devtools:getMetrics', () => {
+    return devtools.getMetrics();
+  });
+
+  ipcMain.handle('devtools:getMemory', () => {
+    return devtools.getMemoryInfo();
+  });
+}

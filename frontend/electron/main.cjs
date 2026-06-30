@@ -79,6 +79,31 @@ function createWindow() {
     console.error('Renderer process crashed');
     dialog.showErrorBox('Error', 'The application has crashed. Please restart.');
   });
+
+  mainWindow.webContents.on('will-drop-files', (event, files) => {
+    event.preventDefault();
+  });
+
+  mainWindow.webContents.on('drop', (event, files) => {
+    event.preventDefault();
+    if (files.length > 0) {
+      const filePath = files[0];
+      if (filePath.endsWith('.json')) {
+        mainWindow.webContents.send('file:dropped', filePath);
+      } else {
+        dialog.showErrorBox('Invalid file', 'Please drop a .json presentation file');
+      }
+    }
+  });
+
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Cut', role: 'cut' },
+      { label: 'Copy', role: 'copy' },
+      { label: 'Paste', role: 'paste' },
+    ]);
+    contextMenu.popup(mainWindow, params.x, params.y);
+  });
 }
 
 app.on('ready', createWindow);
@@ -143,6 +168,15 @@ ipcMain.handle('file:writeFile', async (event, filePath, content) => {
     await fs.promises.writeFile(filePath, content, 'utf-8');
   } catch (err) {
     throw new Error(`Failed to write file: ${err.message}`);
+  }
+});
+
+ipcMain.handle('app:getAppPath', () => app.getAppPath());
+ipcMain.handle('app:getVersion', () => app.getVersion());
+
+ipcMain.on('file:openFromDrop', (event, filePath) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('file:dropped', filePath);
   }
 });
 

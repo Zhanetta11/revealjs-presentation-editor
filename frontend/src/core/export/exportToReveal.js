@@ -22,7 +22,11 @@ import {
   styleToString,
 } from "../render/revealRenderer";
 import { resolveParagraphIndentStyles } from "../text/textFormatting";
-import { getListMarker, getListIndent } from "../utils/listUtils";
+import {
+  getListMarker,
+  getListIndent,
+  LIST_MARKER_WIDTH_EM,
+} from "../utils/listUtils";
 import { downloadHtml } from "./downloadHtml";
 import { downloadBackend } from "./downloadBackend";
 import { getMediaFile } from "../persistence/persistenceFacade";
@@ -145,36 +149,74 @@ function applyFragment(innerHtml, wrapperStyle, animation) {
   return `<div class="${classes}" ${dataAttrs} style="${wrapperStyle}">${innerHtml}</div>`;
 }
 
-export function buildPStyle(paragraphFormatting, listPaddingLeft = null) {
+const validStyleValue = (value) =>
+  value != null && value !== "undefined" ? value : undefined;
+
+const resolveStyleValue = (own, placeholder, master) =>
+  validStyleValue(own)
+  ?? validStyleValue(placeholder)
+  ?? validStyleValue(master);
+
+export function buildPStyle(
+  paragraphFormatting,
+  listPaddingLeft = null,
+  placeholderFormatting = {},
+  masterFormatting = {},
+) {
   const indentStyles = resolveParagraphIndentStyles(
     paragraphFormatting,
-    {},
-    {},
+    placeholderFormatting,
+    masterFormatting,
     listPaddingLeft,
   );
+  const value = (key) => resolveStyleValue(
+    paragraphFormatting[key],
+    placeholderFormatting[key],
+    masterFormatting[key],
+  );
+  const weight = value("weight");
+  const italics = value("italics");
   return [
-    paragraphFormatting.size ? `font-size: ${paragraphFormatting.size}` : "",
-    paragraphFormatting.align ? `text-align: ${paragraphFormatting.align}` : "",
-    paragraphFormatting.margin
-      ? `margin: ${paragraphFormatting.margin}`
+    weight != null
+      ? `font-weight: ${weight === true ? "bold" : weight === false ? "normal" : weight}`
+      : "",
+    italics != null
+      ? `font-style: ${italics === true || italics === "italic" ? "italic" : "normal"}`
+      : "",
+    value("color") ? `color: ${value("color")}` : "",
+    value("size") ? `font-size: ${value("size")}` : "",
+    value("font") ? `font-family: ${value("font")}` : "",
+    value("text-decoration") ? `text-decoration: ${value("text-decoration")}` : "",
+    value("align") ? `text-align: ${value("align")}` : "",
+    value("margin")
+      ? `margin: ${value("margin")}`
       : "margin: 0 0 4px 0",
-    paragraphFormatting["line-spacing"] ? `line-height: ${paragraphFormatting["line-spacing"]}` : "",
+    value("line-spacing") ? `line-height: ${value("line-spacing")}` : "",
     indentStyles.paddingLeft ? `padding-left: ${indentStyles.paddingLeft}` : "",
     indentStyles.textIndent ? `text-indent: ${indentStyles.textIndent}` : "",
   ].filter(Boolean).join("; ");
 }
 
-function buildRunHtml(run) {
+function buildRunHtml(run, fallbackFormatting = {}) {
   const runFormatting = run.formatting ?? {};
   const superSub = run["super-sub-script"];
+  const value = (key) =>
+    validStyleValue(runFormatting[key])
+    ?? validStyleValue(fallbackFormatting[key]);
+  const weight = value("weight");
+  const italics = value("italics");
   const style = [
-    runFormatting.weight ? `font-weight: ${runFormatting.weight}` : "",
-    runFormatting.italics ? "font-style: italic" : "",
-    runFormatting.color ? `color: ${runFormatting.color}` : "",
-    runFormatting.size ? `font-size: ${runFormatting.size}` : "",
-    runFormatting.font ? `font-family: ${runFormatting.font}` : "",
-    runFormatting["text-decoration"] ? `text-decoration: ${runFormatting["text-decoration"]}` : "",
-    runFormatting.highlight && runFormatting.highlight !== "transparent" ? `background-color: ${runFormatting.highlight}` : "",
+    weight != null
+      ? `font-weight: ${weight === true ? "bold" : weight === false ? "normal" : weight}`
+      : "",
+    italics != null
+      ? `font-style: ${italics === true || italics === "italic" ? "italic" : "normal"}`
+      : "",
+    value("color") ? `color: ${value("color")}` : "",
+    value("size") ? `font-size: ${value("size")}` : "",
+    value("font") ? `font-family: ${value("font")}` : "",
+    value("text-decoration") ? `text-decoration: ${value("text-decoration")}` : "",
+    value("highlight") && value("highlight") !== "transparent" ? `background-color: ${value("highlight")}` : "",
     superSub === "super" ? "vertical-align: super; font-size: 0.75em" : "",
     superSub === "sub" ? "vertical-align: sub; font-size: 0.75em" : "",
   ].filter(Boolean).join("; ");
@@ -185,7 +227,12 @@ function buildRunHtml(run) {
   return style ? `<span style="${style}">${text}</span>` : text;
 }
 
-function buildTextElementContent(textElement, animation, placeholderFormatting = {}) {
+export function buildTextElementContent(
+  textElement,
+  animation,
+  placeholderFormatting = {},
+  masterFormatting = {},
+) {
   if (!textElement.paragraphs?.length) return "";
   const sequenceMode = animation?.["effect-options"]?.sequence ?? "as-one-object";
   const perLine = animation && sequenceMode !== "as-one-object";
@@ -194,29 +241,50 @@ function buildTextElementContent(textElement, animation, placeholderFormatting =
   return textElement.paragraphs
     .map((paragraph, pIdx) => {
       const paragraphFormatting = paragraph.formatting ?? {};
-      const rawListType = paragraphFormatting["list-type"] || placeholderFormatting["list-type"] || null;
+      const resolved = (key) => resolveStyleValue(
+        paragraphFormatting[key],
+        placeholderFormatting[key],
+        masterFormatting[key],
+      );
+      const rawListType = resolved("list-type") ?? null;
       const listType = rawListType && rawListType !== "none" ? rawListType : null;
-      const listLevel = paragraphFormatting["indent-level"] ?? placeholderFormatting["indent-level"] ?? 0;
-      const listMarker = paragraphFormatting["list-marker"] ?? placeholderFormatting["list-marker"];
-      const listNumberedStyle = paragraphFormatting["list-numbered-style"] ?? placeholderFormatting["list-numbered-style"];
+      const listLevel = resolved("indent-level") ?? 0;
+      const listMarker = resolved("list-marker");
+      const listNumberedStyle = resolved("list-numbered-style");
 
       if (listType === "numbered") numberedCounter++;
       else if (!listType) numberedCounter = 0;
 
       const listPaddingLeft = listType
-        ? `calc(${getListIndent(listLevel, listType)} + 1.2em)`
+        ? `calc(${getListIndent(listLevel, listType)} + ${LIST_MARKER_WIDTH_EM}em)`
         : null;
-      const pStyle = buildPStyle(paragraphFormatting, listPaddingLeft);
+      const pStyle = buildPStyle(
+        paragraphFormatting,
+        listPaddingLeft,
+        placeholderFormatting,
+        masterFormatting,
+      );
 
       const markerHtml = listType
-        ? `<span style="display:inline-block;width:1.2em;margin-left:calc(-1.2em);text-align:center;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:center;">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, listNumberedStyle)
               : getListMarker(pIdx, "bullets", listMarker, null)
           }</span>`
         : "";
 
-      const runsHtml = (paragraph.runs ?? []).map(buildRunHtml).join("");
+      const fallbackFormatting = {
+        weight: resolved("weight"),
+        italics: resolved("italics"),
+        color: resolved("color"),
+        size: resolved("size"),
+        font: resolved("font"),
+        "text-decoration": resolved("text-decoration"),
+        highlight: resolved("highlight"),
+      };
+      const runsHtml = (paragraph.runs ?? [])
+        .map((run) => buildRunHtml(run, fallbackFormatting))
+        .join("");
 
       if (!perLine) return `<p style="${pStyle}">${markerHtml}${runsHtml}</p>`;
 
@@ -332,7 +400,12 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
       const adjustedAnim = animation && adjustedSeqMap.has(animation.id)
         ? { ...animation, sequence: adjustedSeqMap.get(animation.id) }
         : animation;
-      const content = buildTextElementContent(textElement, adjustedAnim, placeholderFormatting);
+      const content = buildTextElementContent(
+        textElement,
+        adjustedAnim,
+        placeholderFormatting,
+        masterFormatting,
+      );
       if (!animation || sequenceMode === "as-one-object") {
         return applyFragment(content, style, adjustedAnim);
       }

@@ -140,7 +140,7 @@ export default function TextFormattingMenu({
           buildFormatting={(style) =>
             style.value === null
               ? {
-                  "list-type": null,
+                  "list-type": "none",
                   "list-marker": null,
                   "indent-level": 0,
                 }
@@ -169,7 +169,7 @@ export default function TextFormattingMenu({
           buildFormatting={(style) =>
             style.value === null
               ? {
-                  "list-type": null,
+                  "list-type": "none",
                   "list-numbered-style": null,
                   "indent-level": 0,
                 }

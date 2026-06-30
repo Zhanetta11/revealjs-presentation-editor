@@ -32,6 +32,7 @@ export const toAlpha = (n, upper = false) => {
 const LIST_INDENT_PX = 24;
 
 export const MAX_LIST_INDENT_LEVEL = 4;
+export const LIST_MARKER_WIDTH_EM = 1.8;
 
 export const getListIndent = (level = 0, listType) =>
   listType
@@ -74,7 +75,7 @@ export const decreaseIndent = (currentFormatting = {}) => {
 
   if (level <= 0) {
     return {
-      "list-type": null,
+      "list-type": "none",
       "list-marker": null,
       "list-numbered-style": null,
       "indent-level": 0,
@@ -95,7 +96,7 @@ export const toggleList = (
 
   if (isActive) {
     return {
-      "list-type": null,
+      "list-type": "none",
       "list-marker": null,
       "list-numbered-style": null,
       "indent-level": 0,

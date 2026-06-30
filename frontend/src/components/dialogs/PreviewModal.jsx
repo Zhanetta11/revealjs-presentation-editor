@@ -27,7 +27,12 @@ import {
   getFragmentProps,
   getPerLineFragments,
 } from "../../core/render/revealRenderer";
-import { getPlaceholderFormatting, getSlideContentIds } from "../../core/render/slidesetRenderUtils";
+import {
+  getPlaceholderFormatting,
+  getPlaceholderPadding,
+  getPlaceholderBackground,
+  getSlideContentIds,
+} from "../../core/render/slidesetRenderUtils";
 import { paragraphsToHTML } from "../../core/text/textFormatting";
 
 function BgFillElement({ fileLink, width, height, settings = {} }) {
@@ -192,7 +197,16 @@ export default function PreviewModal({ slides, presentation, onClose, initialSli
                     {textElements.filter((element) => !element.hidden).map((textElement, index) => {
                       const animation = animationMap.get(textElement.id);
                       const placeholderFormatting = getPlaceholderFormatting(presentation, slide, textElement);
-                      const baseStyle = buildTextElementStyle(textElement, index, masterFormatting, placeholderFormatting);
+                      const placeholderPadding = getPlaceholderPadding(presentation, slide, textElement);
+                      const placeholderBackground = getPlaceholderBackground(presentation, slide, textElement);
+                      const baseStyle = buildTextElementStyle(
+                        textElement,
+                        index,
+                        masterFormatting,
+                        placeholderFormatting,
+                        placeholderPadding,
+                        placeholderBackground,
+                      );
                       const lines = getTextLines(textElement);
                       const perLine = getPerLineFragments(textElement, animation, lines);
 
@@ -201,7 +215,14 @@ export default function PreviewModal({ slides, presentation, onClose, initialSli
                         return (
                           <div key={textElement.id || index} style={baseStyle}>
                             {perLine.map((entry, lineIndex) => {
-                              const listType = entry.paragraph.formatting?.["list-type"];
+                              const rawListType =
+                                entry.paragraph.formatting?.["list-type"]
+                                ?? placeholderFormatting["list-type"]
+                                ?? masterFormatting["list-type"];
+                              const listType =
+                                rawListType && rawListType !== "none"
+                                  ? rawListType
+                                  : null;
                               const startCounter = listType === "numbered" ? runningCounter : 0;
                               if (listType === "numbered") runningCounter++;
                               else if (!listType) runningCounter = 0;

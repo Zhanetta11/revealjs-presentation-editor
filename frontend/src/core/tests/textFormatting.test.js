@@ -270,6 +270,38 @@ describe("paragraphsToHTML", () => {
     );
     expect(html).toContain("text-align:left");
   });
+
+  it("explicit none disables a list inherited from a placeholder", () => {
+    const html = paragraphsToHTML(
+      [makePara("Plain", { "list-type": "none" })],
+      {},
+      { "list-type": "bullets", "list-marker": "•" },
+      true,
+    );
+    expect(html).not.toContain(">•<");
+    expect(html).not.toContain("padding-left");
+  });
+
+  it("inherits numbered lists from master formatting", () => {
+    const html = paragraphsToHTML(
+      [makePara("Inherited", {})],
+      { "list-type": "numbered" },
+      {},
+      true,
+    );
+    expect(html).toContain(">1.<");
+  });
+
+  it("uses the shared marker width for list padding and markers", () => {
+    const html = paragraphsToHTML(
+      [makePara("Item", { "list-type": "bullets" })],
+      {},
+      {},
+      true,
+    );
+    expect(html).toContain("width:1.8em");
+    expect(html).toContain("+ 1.8em");
+  });
 });
 
 describe("computeCurrentFormatting paragraph selections", () => {

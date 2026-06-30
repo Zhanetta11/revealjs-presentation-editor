@@ -1,5 +1,9 @@
 import { escapeHtml } from "../utils/presentationUtils";
-import { getListMarker, getListIndent } from "../utils/listUtils";
+import {
+  getListMarker,
+  getListIndent,
+  LIST_MARKER_WIDTH_EM,
+} from "../utils/listUtils";
 
 const validStyleValue = (v) => (v != null && v !== "undefined" ? v : undefined);
 
@@ -190,11 +194,16 @@ export const resolveEffectiveFormatting = (
   masterFormatting = {},
   placeholderFormatting = {},
   paragraphFormatting = {},
-) => ({
-  ...masterFormatting,
-  ...placeholderFormatting,
-  ...paragraphFormatting,
-});
+) => {
+  const result = { ...masterFormatting };
+  for (const [k, v] of Object.entries(placeholderFormatting)) {
+    if (v != null) result[k] = v;
+  }
+  for (const [k, v] of Object.entries(paragraphFormatting)) {
+    if (v != null) result[k] = v;
+  }
+  return result;
+};
 
 const parseIndentValue = (value) => {
   if (value == null || value === "") return null;
@@ -343,7 +352,9 @@ export const paragraphsToHTML = (paragraphs, masterFormatting = {}, placeholderF
       else if (!listType) numberedCounter = 0;
 
       const listLevel = Number(r(formatting["indent-level"], placeholderFormatting["indent-level"], masterFormatting["indent-level"]) ?? 0);
-      const listPaddingLeft = listType ? `calc(${getListIndent(listLevel, listType)} + 1.8em)` : null;
+      const listPaddingLeft = listType
+        ? `calc(${getListIndent(listLevel, listType)} + ${LIST_MARKER_WIDTH_EM}em)`
+        : null;
       const { paddingLeft, textIndent } = resolveParagraphIndentStyles(
         formatting,
         placeholderFormatting,
@@ -352,7 +363,7 @@ export const paragraphsToHTML = (paragraphs, masterFormatting = {}, placeholderF
       );
 
       const markerHtml = renderBullets && listType
-        ? `<span style="display:inline-block;width:1.8em;margin-left:calc(-1.8em);text-align:center;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:center;">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, r(formatting["list-numbered-style"], placeholderFormatting["list-numbered-style"], masterFormatting["list-numbered-style"]))
               : getListMarker(index, "bullets", r(formatting["list-marker"], placeholderFormatting["list-marker"], masterFormatting["list-marker"]), null)

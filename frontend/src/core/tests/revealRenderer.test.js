@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { getPerLineFragments } from "../render/revealRenderer";
-import { buildPStyle } from "../export/exportToReveal";
+import {
+  buildPStyle,
+  buildTextElementContent,
+} from "../export/exportToReveal";
 
 function makeTextElement(paragraphs) {
   return { id: "el-1", paragraphs };
@@ -91,6 +94,67 @@ describe("getPerLineFragments", () => {
     const idx2 = Number(result[2].fragmentProps["data-fragment-index"]);
     expect(idx1).toBe(idx0 + 1);
     expect(idx2).toBe(idx0 + 2);
+  });
+});
+
+describe("export text formatting hierarchy", () => {
+  it("resolves master, placeholder, paragraph, and run formatting per paragraph", () => {
+    const textElement = makeTextElement([
+      {
+        formatting: { color: "green" },
+        runs: [{ text: "First", formatting: {} }],
+      },
+      {
+        formatting: {},
+        runs: [{ text: "Second", formatting: { color: "purple" } }],
+      },
+    ]);
+
+    const html = buildTextElementContent(
+      textElement,
+      null,
+      { color: "blue", font: "Arial" },
+      { color: "red", size: "30px" },
+    );
+
+    expect(html).toContain("color: green");
+    expect(html).toContain("color: purple");
+    expect(html).toContain("font-family: Arial");
+    expect(html).toContain("font-size: 30px");
+  });
+
+  it("renders explicit false run values as normal", () => {
+    const textElement = makeTextElement([{
+      formatting: { weight: true, italics: true },
+      runs: [{
+        text: "Normal",
+        formatting: { weight: false, italics: false },
+      }],
+    }]);
+
+    const html = buildTextElementContent(textElement, null);
+
+    expect(html).toContain("font-weight: normal");
+    expect(html).toContain("font-style: normal");
+  });
+
+  it("inherits list settings from master formatting", () => {
+    const textElement = makeTextElement([
+      { formatting: {}, runs: [{ text: "One", formatting: {} }] },
+      { formatting: {}, runs: [{ text: "Two", formatting: {} }] },
+    ]);
+
+    const html = buildTextElementContent(
+      textElement,
+      null,
+      {},
+      { "list-type": "numbered" },
+    );
+
+    expect(html).toContain(">1.<");
+    expect(html).toContain(">2.<");
+    expect(html).toContain("width:1.8em");
+    expect(html).toContain("+ 1.8em");
   });
 });
 

@@ -40,4 +40,55 @@ describe("updateMasterDimensions media scaling", () => {
     expect(media.width).toBe(750);
     expect(media.height).toBe(525);
   });
+
+  test("preserves and scales team-owned shapes, tables, and groups", () => {
+    const presentation = {
+      slideset: {
+        master: {
+          "slide-dimensions": { width: 1000, height: 500 },
+          elements: {
+            text: [],
+            media: [],
+            shapes: [{ id: "master-shape", position: { x: 10, y: 20 }, width: 100, height: 50 }],
+            vendorElements: [{ keep: true }],
+          },
+        },
+        layouts: [{
+          "layout-id": "layout",
+          placeholders: [],
+          elements: {
+            text: [],
+            media: [],
+            tables: [{ id: "layout-table", position: { x: 20, y: 30 }, width: 200, height: 100 }],
+          },
+        }],
+        slides: [{
+          contents: {
+            text: [],
+            media: [],
+            shapes: [{ id: "shape", position: { x: 100, y: 50 }, width: 200, height: 100 }],
+            tables: [{ id: "table", position: { x: 300, y: 100 }, width: 200, height: 100 }],
+            groups: [{ id: "group", elements: ["shape", "table"], position: { x: 50, y: 25 } }],
+          },
+        }],
+      },
+    };
+
+    const updated = updateMasterDimensions(
+      presentation,
+      { width: 2000, height: 1000 },
+      "2:1",
+      "px",
+    );
+
+    expect(updated.slideset.master.elements.shapes[0].position).toEqual({ x: 20, y: 40 });
+    expect(updated.slideset.master.elements.vendorElements).toEqual([{ keep: true }]);
+    expect(updated.slideset.layouts[0].elements.tables[0].width).toBe(400);
+    expect(updated.slideset.slides[0].contents.shapes[0].width).toBe(400);
+    expect(updated.slideset.slides[0].contents.tables[0].position).toEqual({ x: 600, y: 200 });
+    expect(updated.slideset.slides[0].contents.groups[0]).toMatchObject({
+      elements: ["shape", "table"],
+      position: { x: 100, y: 50 },
+    });
+  });
 });

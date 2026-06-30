@@ -206,10 +206,30 @@ const scaleElement = (el, scaleX, scaleY, newW, newH) => {
 };
 
 
-const scaleElements = (elements, scaleX, scaleY, newW, newH) => ({
-  text: (elements?.text ?? []).map((el) => scaleElement(el, scaleX, scaleY, newW, newH)),
-  media: (elements?.media ?? []).map((el) => scaleElement(el, scaleX, scaleY, newW, newH)),
+const scalePositionOnly = (element, scaleX, scaleY, newW, newH) => ({
+  ...element,
+  position: {
+    x: Math.max(0, Math.min(Math.round((element.position?.x ?? 0) * scaleX), newW)),
+    y: Math.max(0, Math.min(Math.round((element.position?.y ?? 0) * scaleY), newH)),
+  },
 });
+
+const scaleElements = (elements, scaleX, scaleY, newW, newH) => {
+  const scaled = { ...elements };
+  for (const key of ["text", "media", "shapes", "tables"]) {
+    if (Array.isArray(elements?.[key])) {
+      scaled[key] = elements[key].map((element) =>
+        scaleElement(element, scaleX, scaleY, newW, newH),
+      );
+    }
+  }
+  if (Array.isArray(elements?.groups)) {
+    scaled.groups = elements.groups.map((group) =>
+      scalePositionOnly(group, scaleX, scaleY, newW, newH),
+    );
+  }
+  return scaled;
+};
 
 export const updateMasterDimensions = (
   presentation,
@@ -256,6 +276,9 @@ export const updateMasterDimensions = (
       ...slide.contents,
       text: (slide.contents?.text ?? []).map((el) => scaleElement(el, scaleX, scaleY, newW, newH)),
       media: (slide.contents?.media ?? []).map((el) => scaleElement(el, scaleX, scaleY, newW, newH)),
+      shapes: (slide.contents?.shapes ?? []).map((el) => scaleElement(el, scaleX, scaleY, newW, newH)),
+      tables: (slide.contents?.tables ?? []).map((el) => scaleElement(el, scaleX, scaleY, newW, newH)),
+      groups: (slide.contents?.groups ?? []).map((el) => scalePositionOnly(el, scaleX, scaleY, newW, newH)),
     },
   }));
 

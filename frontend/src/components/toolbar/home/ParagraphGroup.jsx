@@ -86,7 +86,7 @@ export default function ParagraphGroup({
             title="Bulleted list"
             onClick={() =>
               fmt({
-                "list-type": currentListType === "bullets" ? null : "bullets",
+                "list-type": currentListType === "bullets" ? "none" : "bullets",
                 "list-marker":
                   currentListType === "bullets"
                     ? null
@@ -124,7 +124,7 @@ export default function ParagraphGroup({
                     onClick={() => {
                       fmt(
                         marker === null
-                          ? { "list-type": null, "list-marker": null, "indent-level": 0 }
+                          ? { "list-type": "none", "list-marker": null, "indent-level": 0 }
                           : { "list-type": "bullets", "list-marker": marker, "indent-level": currentListLevel },
                       );
                       setShowBulletPicker(false);
@@ -156,7 +156,7 @@ export default function ParagraphGroup({
             title="Numbered list"
             onClick={() =>
               fmt({
-                "list-type": currentListType === "numbered" ? null : "numbered",
+                "list-type": currentListType === "numbered" ? "none" : "numbered",
                 "list-numbered-style":
                   currentListType === "numbered"
                     ? null
@@ -194,7 +194,7 @@ export default function ParagraphGroup({
                     onClick={() => {
                       fmt(
                         style === null
-                          ? { "list-type": null, "list-numbered-style": null, "indent-level": 0 }
+                          ? { "list-type": "none", "list-numbered-style": null, "indent-level": 0 }
                           : { "list-type": "numbered", "list-numbered-style": style, "indent-level": currentListLevel },
                       );
                       setShowNumberedPicker(false);

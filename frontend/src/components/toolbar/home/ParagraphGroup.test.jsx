@@ -106,7 +106,19 @@ describe("ParagraphGroup — list buttons", () => {
     });
     fireEvent.click(screen.getByTitle("Bulleted list"));
     expect(onFormatChange).toHaveBeenCalledWith(
-      expect.objectContaining({ "list-type": null }),
+      expect.objectContaining({ "list-type": "none" }),
+    );
+  });
+
+  test("clicking active Numbered list stores an explicit none override", () => {
+    const onFormatChange = vi.fn();
+    renderGroup({
+      currentFormatting: { "list-type": "numbered" },
+      onFormatChange,
+    });
+    fireEvent.click(screen.getByTitle("Numbered list"));
+    expect(onFormatChange).toHaveBeenCalledWith(
+      expect.objectContaining({ "list-type": "none" }),
     );
   });
 });

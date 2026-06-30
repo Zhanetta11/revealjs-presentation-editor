@@ -78,13 +78,13 @@ export const computeFormattingState = ({
         activeSelectionForFormatting.rangeEnd
     );
 
-  const selectionFormatting = hasRealSelection
+  const rawSelFmt = hasRealSelection
+    ? (getSelectionFormatting(activeTextEl, activeSelectionForFormatting) ?? {})
+    : null;
+  const selectionFormatting = rawSelFmt
     ? {
         ...effectiveFormatting,
-        ...(getSelectionFormatting(
-          activeTextEl,
-          activeSelectionForFormatting,
-        ) ?? {}),
+        ...Object.fromEntries(Object.entries(rawSelFmt).filter(([, v]) => v != null)),
       }
     : null;
 

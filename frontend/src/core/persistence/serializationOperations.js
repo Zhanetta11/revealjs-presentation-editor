@@ -49,7 +49,7 @@ const collectUsedFonts = (presentation) => {
     ...[...fontNames]
       .filter((name) => !existingIds.has(name))
       .map((name) => ({ "font-id": name, "font-file": "" })),
-  ].filter((f) => fontNames.has(f["font-id"]));
+  ];
 
   return {
     ...presentation,
@@ -67,23 +67,53 @@ const computeParagraphBullets = (presentation) => {
   const slideset = presentation?.slideset;
   if (!slideset) return presentation;
 
-  const transformParagraphs = (paragraphs) =>
+  const masterFormatting = slideset.master?.formatting ?? {};
+  const layoutsById = new Map(
+    (slideset.layouts ?? []).map((layout) => [layout["layout-id"], layout]),
+  );
+
+  const transformParagraphs = (
+    paragraphs,
+    placeholderFormatting = {},
+    inheritedMasterFormatting = masterFormatting,
+  ) =>
     (paragraphs ?? []).map((para) => ({
       ...para,
-      bullets: listTypeToBullets(para.formatting?.["list-type"]),
+      bullets: listTypeToBullets(
+        para.formatting?.["list-type"]
+        ?? placeholderFormatting["list-type"]
+        ?? inheritedMasterFormatting["list-type"],
+      ),
     }));
 
-  const transformTextElements = (elements) =>
+  const transformTextElements = (
+    elements,
+    getPlaceholderFormatting = () => ({}),
+    inheritedMasterFormatting = masterFormatting,
+  ) =>
     (elements ?? []).map((el) => ({
       ...el,
-      paragraphs: transformParagraphs(el.paragraphs),
+      paragraphs: transformParagraphs(
+        el.paragraphs,
+        getPlaceholderFormatting(el),
+        inheritedMasterFormatting,
+      ),
     }));
 
   const slides = (slideset.slides ?? []).map((slide) => ({
     ...slide,
     contents: {
       ...slide.contents,
-      text: transformTextElements(slide.contents?.text),
+      text: transformTextElements(
+        slide.contents?.text,
+        (element) => {
+          const layout = layoutsById.get(slide["layout-id"]);
+          return (layout?.placeholders ?? []).find(
+            (placeholder) =>
+              placeholder["placeholder-id"] === element["placeholder-id"],
+          )?.formatting ?? {};
+        },
+      ),
     },
   }));
 
@@ -105,7 +135,11 @@ const computeParagraphBullets = (presentation) => {
         ...slideset.master,
         elements: {
           ...slideset.master?.elements,
-          text: transformTextElements(slideset.master?.elements?.text),
+          text: transformTextElements(
+            slideset.master?.elements?.text,
+            () => ({}),
+            masterFormatting,
+          ),
         },
       },
     },
@@ -131,9 +165,11 @@ const migratePresentation = (presentation) => {
   const masterFormatting = presentation?.slideset?.master?.formatting ?? {};
   const placeholderMap = new Map();
   for (const layout of layouts) {
+    const layoutPlaceholders = new Map();
     for (const ph of layout.placeholders ?? []) {
-      placeholderMap.set(ph["placeholder-id"], ph.formatting ?? {});
+      layoutPlaceholders.set(ph["placeholder-id"], ph.formatting ?? {});
     }
+    placeholderMap.set(layout["layout-id"], layoutPlaceholders);
   }
 
   const slides = (presentation?.slideset?.slides ?? []).map((slide) => ({
@@ -141,7 +177,10 @@ const migratePresentation = (presentation) => {
     contents: {
       ...slide.contents,
       text: (slide.contents?.text ?? []).map((el) => {
-        const phFormatting = placeholderMap.get(el["placeholder-id"]) ?? {};
+        const phFormatting =
+          placeholderMap
+            .get(slide["layout-id"])
+            ?.get(el["placeholder-id"]) ?? {};
         return {
           ...el,
           paragraphs: migrateParagraphFormatting(el.paragraphs, phFormatting, masterFormatting),

@@ -25,7 +25,7 @@ const getPlaceholderDefaultText = (placeholder) => {
     case "subtitle": return "Click to edit subtitle";
     case "footer": return "Footer";
     case "date": return "Date";
-    case "page-number": return "#";
+    case "slide-number": return "#";
     default: return "Click to edit text";
   }
 };
@@ -35,14 +35,49 @@ const createTextFromPlaceholder = (placeholder) => ({
   userModified: false,
 });
 
-const updateElementFromPlaceholder = (element, placeholders, isModified) => {
-  const match = placeholders.find(
+const detachFromPlaceholder = (element) => {
+  const detached = { ...element };
+  delete detached["placeholder-id"];
+  delete detached["pos-type"];
+  return detached;
+};
+
+const hasGeometryOverride = (element, placeholder) => {
+  if (!placeholder) return false;
+  return (
+    (element.position?.x ?? 0) !== (placeholder.position?.x ?? 0)
+    || (element.position?.y ?? 0) !== (placeholder.position?.y ?? 0)
+    || (element.width ?? 0) !== (placeholder.width ?? 0)
+    || (element.height ?? 0) !== (placeholder.height ?? 0)
+    || (element.rotation ?? 0) !== (placeholder.rotation ?? 0)
+  );
+};
+
+const hasBackgroundOverride = (element, placeholder) =>
+  (element.background ?? "#FFFFFF00")
+  !== (placeholder?.background ?? "#FFFFFF00");
+
+const updateElementFromPlaceholder = (
+  element,
+  previousPlaceholders,
+  updatedPlaceholders,
+  isContentModified,
+) => {
+  const previousMatch = previousPlaceholders.find(
+    (p) => p["placeholder-id"] === element["placeholder-id"],
+  );
+  const match = updatedPlaceholders.find(
     (p) => p["placeholder-id"] === element["placeholder-id"],
   );
 
-  if (!match) return element;
+  if (!match) {
+    return isContentModified(element)
+      ? detachFromPlaceholder(element)
+      : null;
+  }
 
-  const geometryModified = isModified(element);
+  const geometryModified = hasGeometryOverride(element, previousMatch);
+  const backgroundModified = hasBackgroundOverride(element, previousMatch);
 
   const updated = {
     ...element,
@@ -51,11 +86,17 @@ const updateElementFromPlaceholder = (element, placeholders, isModified) => {
       width: match.width,
       height: match.height,
       rotation: match.rotation ?? element.rotation ?? 0,
-      background: match.background ?? element.background,
     }),
+    ...(backgroundModified
+      ? {}
+      : { background: match.background ?? "#FFFFFF00" }),
   };
 
-  if (element.paragraphs && match.promptText !== undefined && !geometryModified) {
+  if (
+    element.paragraphs
+    && match.promptText !== undefined
+    && !isContentModified(element)
+  ) {
     updated.paragraphs = element.paragraphs.map((p, pIdx) => {
       if (pIdx !== 0) return p;
       return {
@@ -321,7 +362,8 @@ export const applyLayoutToSlide = (presentation, slideIndex, layoutId) => {
       };
       return { updated };
     }
-    if (!pid || isModified(el)) return { kept: el };
+    if (!pid) return { kept: el };
+    if (isModified(el)) return { kept: detachFromPlaceholder(el) };
     return { remove: true };
   };
 
@@ -409,15 +451,34 @@ export const propagateLayoutChanges = (
   layoutId,
   updatedPlaceholders,
 ) => {
+  const previousLayout = getLayouts(presentation).find(
+    (layout) => layout["layout-id"] === layoutId,
+  );
+  const previousPlaceholders = previousLayout?.placeholders ?? [];
+
   const slides = getSlides(presentation).map((slide) => {
     if (slide["layout-id"] !== layoutId) return slide;
 
-    const updatedText = (slide.contents?.text ?? []).map((el) =>
-      updateElementFromPlaceholder(el, updatedPlaceholders, isTextModified),
-    );
-    const updatedMedia = (slide.contents?.media ?? []).map((el) =>
-      updateElementFromPlaceholder(el, updatedPlaceholders, isMediaModified),
-    );
+    const updatedText = (slide.contents?.text ?? [])
+      .map((el) =>
+        updateElementFromPlaceholder(
+          el,
+          previousPlaceholders,
+          updatedPlaceholders,
+          isTextModified,
+        ),
+      )
+      .filter(Boolean);
+    const updatedMedia = (slide.contents?.media ?? [])
+      .map((el) =>
+        updateElementFromPlaceholder(
+          el,
+          previousPlaceholders,
+          updatedPlaceholders,
+          isMediaModified,
+        ),
+      )
+      .filter(Boolean);
 
     const handledPids = new Set([
       ...updatedText.map((el) => el["placeholder-id"]).filter(Boolean),
@@ -485,8 +546,8 @@ export const resetSlideToLayout = (presentation, slideIndex) => {
       position: { ...match.position },
       width: match.width,
       height: match.height,
-      background: match.background ?? el.background,
-      rotation: 0,
+      background: match.background ?? "#FFFFFF00",
+      rotation: match.rotation ?? 0,
       paragraphs: resetParagraphs,
     };
   });
@@ -500,7 +561,7 @@ export const resetSlideToLayout = (presentation, slideIndex) => {
       position: { ...match.position },
       width: match.width,
       height: match.height,
-      rotation: 0,
+      rotation: match.rotation ?? 0,
     };
   });
 

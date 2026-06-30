@@ -27,7 +27,7 @@ export const TITLE_PLACEHOLDER = {
 export const FOOTER_PLACEHOLDERS = [
   { "placeholder-id": "footer-date",   position: { x: 60,  y: 640 }, width: 260, height: 40, type: "text", role: "footer", padding: { css: "4px" }, background: "#FFFFFF00", formatting: { size: "20px", align: "center" }, promptText: "Date" },
   { "placeholder-id": "footer-center", position: { x: 380, y: 640 }, width: 520, height: 40, type: "text", role: "footer", padding: { css: "4px" }, background: "#FFFFFF00", formatting: { size: "20px", align: "center" }, promptText: "Footer" },
-  { "placeholder-id": "footer-page",   position: { x: 960, y: 640 }, width: 260, height: 40, type: "text", role: "footer", padding: { css: "4px" }, background: "#FFFFFF00", formatting: { size: "20px", align: "center" }, promptText: "#" },
+  { "placeholder-id": "footer-page",   position: { x: 960, y: 640 }, width: 260, height: 40, type: "text", role: "slide-number", padding: { css: "4px" }, background: "#FFFFFF00", formatting: { size: "20px", align: "center" }, promptText: "#" },
 ];
 
 export const createMasterTextElement = (id, position, width, height, text, formatting) => ({

@@ -19,7 +19,11 @@ import {
   resolveTextStyle,
   resolveEffectiveFormatting,
 } from "../../../core/text/textFormatting";
-import { getListMarker, getListIndent } from "../../../core/utils/listUtils";
+import {
+  getListMarker,
+  getListIndent,
+  LIST_MARKER_WIDTH_EM,
+} from "../../../core/utils/listUtils";
 import {
   getCaretOffset,
   setCaretOffset,
@@ -142,10 +146,13 @@ export default function TextElement({
     );
   const toolbarFormatting = savedSel
     ? isRealSelection
-      ? {
-          ...effectiveParaFormatting,
-          ...(getSelectionFormatting(textElement, savedSel) ?? {}),
-        }
+      ? (() => {
+          const raw = getSelectionFormatting(textElement, savedSel) ?? {};
+          return {
+            ...effectiveParaFormatting,
+            ...Object.fromEntries(Object.entries(raw).filter(([, v]) => v != null)),
+          };
+        })()
       : {
           ...effectiveParaFormatting,
           ...getFormattingAtCursor(textElement, savedSel),
@@ -159,13 +166,29 @@ export default function TextElement({
       (p.runs ?? []).find((run) => (run.text ?? "").length > 0)?.formatting ??
       p.runs?.[0]?.formatting ??
       {};
-    const resolvedListType = pFmt["list-type"] || placeholderFormatting["list-type"] || null;
+    const resolvedListType =
+      pFmt["list-type"]
+      ?? placeholderFormatting["list-type"]
+      ?? masterFormatting["list-type"]
+      ?? null;
     const pListType = resolvedListType && resolvedListType !== "none" ? resolvedListType : null;
     return {
       listType: pListType,
-      listLevel: pFmt["indent-level"] ?? placeholderFormatting["indent-level"] ?? 0,
-      listMarker: pFmt["list-marker"] ?? placeholderFormatting["list-marker"] ?? "•",
-      listNumberedStyle: pFmt["list-numbered-style"] ?? placeholderFormatting["list-numbered-style"] ?? "decimal",
+      listLevel:
+        pFmt["indent-level"]
+        ?? placeholderFormatting["indent-level"]
+        ?? masterFormatting["indent-level"]
+        ?? 0,
+      listMarker:
+        pFmt["list-marker"]
+        ?? placeholderFormatting["list-marker"]
+        ?? masterFormatting["list-marker"]
+        ?? "•",
+      listNumberedStyle:
+        pFmt["list-numbered-style"]
+        ?? placeholderFormatting["list-numbered-style"]
+        ?? masterFormatting["list-numbered-style"]
+        ?? "decimal",
       markerStyle: {
         fontSize: resolveTextStyle(
           firstRunFmt.size,
@@ -376,13 +399,14 @@ export default function TextElement({
             let numberedCounter = 0;
             return paragraphListInfos.map((info, i) => {
               if (info.listType === "numbered") numberedCounter++;
+              else if (!info.listType) numberedCounter = 0;
               return (
                 <span
                   key={i}
                   className="list-marker-line"
                   style={{
                     top: `${paragraphTops[i] ?? 0}px`,
-                    width: `calc(${getListIndent(info.listLevel, info.listType)} + 1.2em)`,
+                    width: `calc(${getListIndent(info.listLevel, info.listType)} + ${LIST_MARKER_WIDTH_EM}em)`,
                     ...info.markerStyle,
                   }}
                 >
@@ -497,9 +521,17 @@ export default function TextElement({
           if (!offset) return;
           const para = textElement.paragraphs?.[offset.paragraphIdx];
           const paraFmt = para?.formatting ?? {};
-          if (!paraFmt["list-type"] || paraFmt["list-type"] === "none") return;
+          const effectiveListType =
+            paraFmt["list-type"]
+            ?? placeholderFormatting["list-type"]
+            ?? masterFormatting["list-type"];
+          if (!effectiveListType || effectiveListType === "none") return;
           e.preventDefault();
-          const currentLevel = paraFmt["indent-level"] ?? 0;
+          const currentLevel =
+            paraFmt["indent-level"]
+            ?? placeholderFormatting["indent-level"]
+            ?? masterFormatting["indent-level"]
+            ?? 0;
           const MAX_LIST_INDENT_LEVEL = 4;
           const newLevel = e.shiftKey
             ? Math.max(0, currentLevel - 1)

@@ -76,10 +76,14 @@ export const duplicateSlide = (presentation, slideIndex) => {
     return {
       ...structuredClone(el),
       id: newId,
-      paragraphs: (el.paragraphs ?? []).map((p) => ({
-        ...structuredClone(p),
-        id: createId("paragraph"),
-      })),
+      paragraphs: (el.paragraphs ?? []).map((p) => {
+        const newParagraphId = createId("paragraph");
+        if (p.id) idMap.set(p.id, newParagraphId);
+        return {
+          ...structuredClone(p),
+          id: newParagraphId,
+        };
+      }),
     };
   });
 
@@ -89,31 +93,66 @@ export const duplicateSlide = (presentation, slideIndex) => {
     return { ...structuredClone(el), id: newId };
   });
 
+  const cloneParagraphsWithIds = (paragraphs) =>
+    (paragraphs ?? []).map((paragraph) => {
+      const newParagraphId = createId("paragraph");
+      if (paragraph.id) idMap.set(paragraph.id, newParagraphId);
+      return {
+        ...structuredClone(paragraph),
+        id: newParagraphId,
+      };
+    });
+
+  const cloneElementsWithIds = (elements, prefix) =>
+    (elements ?? []).map((element) => {
+      const newId = createId(prefix);
+      if (element.id) idMap.set(element.id, newId);
+      const cloned = { ...structuredClone(element), id: newId };
+      if (Array.isArray(element.paragraphs)) {
+        cloned.paragraphs = cloneParagraphsWithIds(element.paragraphs);
+      }
+      if (Array.isArray(element.table?.rows)) {
+        cloned.table = {
+          ...cloned.table,
+          rows: element.table.rows.map((row) => ({
+            ...structuredClone(row),
+            cells: (row.cells ?? []).map((cell) => ({
+              ...structuredClone(cell),
+              paragraphs: cloneParagraphsWithIds(cell.paragraphs),
+            })),
+          })),
+        };
+      }
+      return cloned;
+    });
+
+  const shapes = cloneElementsWithIds(source.contents?.shapes, "shape");
+  const tables = cloneElementsWithIds(source.contents?.tables, "table");
+  const clonedGroups = cloneElementsWithIds(source.contents?.groups, "group");
+  const groups = clonedGroups.map((group) => ({
+    ...group,
+    elements: (group.elements ?? []).map((id) => idMap.get(id) ?? id),
+  }));
+
   const duplicated = {
     ...source,
-    title: { content: `${source.title?.content ?? "Slide"} Copy` },
+    title: {
+      ...structuredClone(source.title ?? {}),
+      content: `${source.title?.content ?? "Slide"} Copy`,
+    },
     contents: {
       ...structuredClone(source.contents),
       text,
       media,
-      shapes: (source.contents?.shapes ?? []).map((el) => ({
-        ...structuredClone(el),
-        id: createId("shape"),
-      })),
-      tables: (source.contents?.tables ?? []).map((el) => ({
-        ...structuredClone(el),
-        id: createId("table"),
-      })),
-      groups: (source.contents?.groups ?? []).map((el) => ({
-        ...structuredClone(el),
-        id: createId("group"),
-      })),
+      shapes,
+      tables,
+      groups,
       animations: (source.contents?.animations ?? [])
         .slice()
         .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
         .map((anim, index) => ({
           ...structuredClone(anim),
-          id: idMap.get(anim.id) ?? createId("animation"),
+          id: idMap.get(anim.id) ?? anim.id,
           sequence: index + 1,
         })),
     },

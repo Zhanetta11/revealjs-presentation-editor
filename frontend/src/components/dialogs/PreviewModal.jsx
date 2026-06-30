@@ -23,6 +23,7 @@ import {
   getSlideMediaElements,
   getSlideDimensions,
   getRevealTransition,
+  getRevealTransitionSpeed,
   buildAdjustedAnimationMap,
   getFragmentProps,
   getPerLineFragments,
@@ -173,6 +174,7 @@ export default function PreviewModal({ slides, presentation, onClose, initialSli
                 <section
                   key={`slide-${slideIndex}`}
                   data-transition={getRevealTransition(slide)}
+                  data-transition-speed={getRevealTransitionSpeed(slide)}
                   style={{
                     background: (() => {
                       const bg = slide?.contents?.background ?? null;

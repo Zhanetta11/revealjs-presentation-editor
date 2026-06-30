@@ -352,11 +352,17 @@ export function buildColorThemeStyle(presentation) {
 }
 
 const VALID_TRANSITIONS = new Set(TRANSITIONS.map((t) => t.value));
+const TRANSITION_SPEED_MAP = { 0.3: "fast", 0.75: "default", 1.5: "slow" };
 
 export function getRevealTransition(slide) {
   const transition = slide?.contents?.transition;
   if (transition && VALID_TRANSITIONS.has(transition)) return transition;
   return DEFAULT_TRANSITION;
+}
+
+export function getRevealTransitionSpeed(slide) {
+  const duration = slide?.contents?.transitionDuration ?? 0.75;
+  return TRANSITION_SPEED_MAP[duration] ?? "default";
 }
 
 const FRAGMENT_EFFECT_CLASSES = new Set([

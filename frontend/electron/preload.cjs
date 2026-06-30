@@ -18,4 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   getAppPath: () => ipcRenderer.invoke('app:getAppPath'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
+
+  getConfig: (key) => ipcRenderer.invoke('config:get', key),
+  setConfig: (key, value) => ipcRenderer.invoke('config:set', key, value),
+
+  getLogsDir: () => ipcRenderer.invoke('logs:getDir'),
 });

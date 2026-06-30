@@ -2,21 +2,20 @@ const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 const fs = require('fs');
+const logger = require('./logger.cjs');
+const config = require('./config.cjs');
 
 let mainWindow;
 
 const userDataPath = app.getPath('userData');
-const windowStatePath = path.join(userDataPath, 'window-state.json');
 
 function loadWindowState() {
   try {
-    if (fs.existsSync(windowStatePath)) {
-      return JSON.parse(fs.readFileSync(windowStatePath, 'utf-8'));
-    }
+    return config.get('windowState');
   } catch (err) {
-    console.error('Failed to load window state:', err);
+    logger.error('Failed to load window state', { error: err.message });
+    return { width: 1280, height: 720, x: undefined, y: undefined };
   }
-  return { width: 1280, height: 720, x: undefined, y: undefined };
 }
 
 function saveWindowState() {
@@ -30,14 +29,15 @@ function saveWindowState() {
       isMaximized: mainWindow.isMaximized(),
     };
     try {
-      fs.writeFileSync(windowStatePath, JSON.stringify(state, null, 2));
+      config.set('windowState', state);
     } catch (err) {
-      console.error('Failed to save window state:', err);
+      logger.error('Failed to save window state', { error: err.message });
     }
   }
 }
 
 function createWindow() {
+  logger.info('Creating main window');
   const windowState = loadWindowState();
 
   mainWindow = new BrowserWindow({
@@ -62,6 +62,7 @@ function createWindow() {
     ? 'http://localhost:5173'
     : `file://${path.join(__dirname, '../dist/index.html')}`;
 
+  logger.info('Loading URL', { url: startUrl });
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
@@ -76,7 +77,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('crashed', () => {
-    console.error('Renderer process crashed');
+    logger.error('Renderer process crashed');
     dialog.showErrorBox('Error', 'The application has crashed. Please restart.');
   });
 
@@ -106,28 +107,37 @@ function createWindow() {
   });
 }
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+  logger.info('App ready', { version: app.getVersion() });
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
+  logger.info('All windows closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('activate', () => {
+  logger.debug('App activated');
   if (mainWindow === null) {
     createWindow();
   }
 });
 
-app.on('before-quit', saveWindowState);
+app.on('before-quit', () => {
+  logger.info('App quitting');
+  saveWindowState();
+});
 
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught exception:', err);
+  logger.error('Uncaught exception', { error: err.message, stack: err.stack });
   dialog.showErrorBox('Error', 'An unexpected error occurred: ' + err.message);
 });
 
 ipcMain.handle('dialog:openFile', async () => {
+  logger.debug('Open file dialog requested');
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [
@@ -135,14 +145,21 @@ ipcMain.handle('dialog:openFile', async () => {
       { name: 'All Files', extensions: ['*'] },
     ],
   });
+  if (result.filePaths.length > 0) {
+    logger.info('File opened', { path: result.filePaths[0] });
+  }
   return result.filePaths;
 });
 
 ipcMain.handle('dialog:saveFile', async (event, defaultName) => {
+  logger.debug('Save file dialog requested', { defaultName });
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName || 'presentation.json',
     filters: [{ name: 'JSON', extensions: ['json'] }],
   });
+  if (result.filePath) {
+    logger.info('File save path selected', { path: result.filePath });
+  }
   return result.filePath;
 });
 
@@ -156,17 +173,24 @@ ipcMain.handle('dialog:showMessage', async (event, title, message) => {
 
 ipcMain.handle('file:readFile', async (event, filePath) => {
   try {
-    return await fs.promises.readFile(filePath, 'utf-8');
+    logger.debug('Reading file', { path: filePath });
+    const content = await fs.promises.readFile(filePath, 'utf-8');
+    logger.info('File read successfully', { path: filePath, size: content.length });
+    return content;
   } catch (err) {
+    logger.error('Failed to read file', { path: filePath, error: err.message });
     throw new Error(`Failed to read file: ${err.message}`);
   }
 });
 
 ipcMain.handle('file:writeFile', async (event, filePath, content) => {
   try {
+    logger.debug('Writing file', { path: filePath, size: content.length });
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
     await fs.promises.writeFile(filePath, content, 'utf-8');
+    logger.info('File written successfully', { path: filePath });
   } catch (err) {
+    logger.error('Failed to write file', { path: filePath, error: err.message });
     throw new Error(`Failed to write file: ${err.message}`);
   }
 });
@@ -324,3 +348,16 @@ template.push({
 
 const menu = Menu.buildFromTemplate(template);
 Menu.setApplicationMenu(menu);
+
+ipcMain.handle('config:get', (event, key) => {
+  return config.get(key);
+});
+
+ipcMain.handle('config:set', (event, key, value) => {
+  config.set(key, value);
+  logger.debug('Config updated', { key, valueType: typeof value });
+});
+
+ipcMain.handle('logs:getDir', () => {
+  return logger.getLogsDir();
+});

@@ -99,6 +99,47 @@ electronAPI.onFileDrop((filePath) => {
 
 const appPath = await electronAPI.getAppPath()
 const version = await electronAPI.getVersion()
+
+const theme = await electronAPI.getConfig('theme')
+await electronAPI.setConfig('theme', 'dark')
+await electronAPI.setConfig('autoSave', true)
+
+const logsDir = await electronAPI.getLogsDir()
+```
+
+## Configuration System
+
+Application settings are automatically persisted to `userData/config.json`:
+
+```javascript
+// Available settings
+{
+  theme: 'light',              // 'light' or 'dark'
+  language: 'en',
+  autoSave: true,
+  autoSaveInterval: 60000,     // milliseconds
+  recentFiles: []              // array of file paths
+}
+```
+
+## Logging System
+
+All application events are logged to `userData/logs/app-YYYY-MM-DD.log`:
+
+**Log Levels:**
+- `INFO` — Important events (file operations, app lifecycle)
+- `WARN` — Warning conditions
+- `ERROR` — Error conditions with stack traces
+- `DEBUG` — Detailed information (dev mode only)
+
+**Example Log Entry:**
+```
+[2026-06-30T10:15:32.123Z] [INFO] File read successfully | {"path":"/path/to/file.json","size":1024}
+```
+
+Access logs from React:
+```javascript
+const logsDir = await window.electronAPI.getLogsDir()
 ```
 
 ## Keyboard Shortcuts

@@ -30,6 +30,7 @@ import {
 import { downloadHtml } from "./downloadHtml";
 import { downloadBackend } from "./downloadBackend";
 import { getMediaFile } from "../persistence/persistenceFacade";
+import { fontFormat, fontExtension } from "../utils/fontFormat";
 import JSZip from "jszip";
 
 function buildColorThemeCss(presentation) {
@@ -82,7 +83,7 @@ async function resolveMediaLinks(slides, masterElements = {}) {
 
 async function resolveMediaForZip(slides, masterElements = {}) {
   const resolvedMap = new Map();
-  let counter = 1;
+  const counters = { image: 1, video: 1 };
   const allMedia = [
     ...(masterElements.media ?? []),
     ...slides.flatMap((slide) => getMediaElements(slide)),
@@ -94,8 +95,9 @@ async function resolveMediaForZip(slides, masterElements = {}) {
       const key = fileLink.replace("indexeddb://", "");
       const blob = await getMediaFile(key);
       if (blob) {
-        const ext = blob.type.split("/")[1] ?? "jpg";
-        const filename = `media/image_${counter++}.${ext}`;
+        const kind = media["media-type"] === "video" ? "video" : "image";
+        const ext = blob.type.split("/")[1] ?? (kind === "video" ? "mp4" : "jpg");
+        const filename = `media/${kind}/${kind}_${counters[kind]++}.${ext}`;
         resolvedMap.set(fileLink, { src: filename, blob });
       }
     } else {
@@ -103,6 +105,58 @@ async function resolveMediaForZip(slides, masterElements = {}) {
     }
   }
   return resolvedMap;
+}
+
+async function resolveFontsForHtml(fonts) {
+  const map = new Map();
+  for (const font of fonts ?? []) {
+    const fontId = font["font-id"];
+    const fileLink = font["font-file"];
+    if (!fontId || !fileLink) continue;
+    if (fileLink.startsWith("indexeddb://")) {
+      const key = fileLink.replace("indexeddb://", "");
+      const blob = await getMediaFile(key);
+      if (blob) {
+        map.set(fontId, { src: await blobToDataUrl(blob), mimeType: blob.type, originalPath: fileLink });
+      }
+    } else {
+      map.set(fontId, { src: fileLink, mimeType: "", originalPath: fileLink });
+    }
+  }
+  return map;
+}
+
+async function resolveFontsForZip(fonts) {
+  const map = new Map();
+  let counter = 1;
+  for (const font of fonts ?? []) {
+    const fontId = font["font-id"];
+    const fileLink = font["font-file"];
+    if (!fontId || !fileLink) continue;
+    if (fileLink.startsWith("indexeddb://")) {
+      const key = fileLink.replace("indexeddb://", "");
+      const blob = await getMediaFile(key);
+      if (blob) {
+        const ext = fontExtension(fontFormat(fileLink, blob.type));
+        const filename = `fonts/font_${counter++}.${ext}`;
+        map.set(fontId, { src: filename, blob, mimeType: blob.type, originalPath: fileLink });
+      }
+    } else {
+      map.set(fontId, { src: fileLink, blob: null, mimeType: "", originalPath: fileLink });
+    }
+  }
+  return map;
+}
+
+function buildFontFaceCss(fontMap) {
+  const rules = [];
+  for (const [fontId, info] of fontMap) {
+    const format = fontFormat(info.originalPath, info.mimeType);
+    rules.push(
+      `@font-face {\n  font-family: "${fontId}";\n  src: url("${info.src}") format("${format}");\n  font-weight: normal;\n  font-style: normal;\n}`,
+    );
+  }
+  return rules.join("\n");
 }
 
 function buildAdjustedSequenceMap(animations, textElements) {
@@ -467,7 +521,7 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
     </section>`;
 }
 
-function buildHtmlContent(title, colorThemeCss, width, height, slideSections) {
+function buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss = "") {
   return `<!doctype html>
 <html>
 <head>
@@ -476,6 +530,7 @@ function buildHtmlContent(title, colorThemeCss, width, height, slideSections) {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/white.css">
   <style>
+    ${fontFaceCss}
     ${colorThemeCss}
     .reveal .slides section { text-align: left; }
     .reveal .slides section p { margin: 0 0 4px 0; }
@@ -532,11 +587,14 @@ export async function exportToReveal(presentation) {
   const masterFormatting = presentation?.slideset?.master?.formatting ?? {};
   const masterElementsHtml = buildMasterElementsHtml(presentation, masterFormatting, getSrc);
 
+  const fontMap = await resolveFontsForHtml(presentation?.slideset?.fonts);
+  const fontFaceCss = buildFontFaceCss(fontMap);
+
   const slideSections = slides
     .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml))
     .join("\n");
 
-  const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections);
+  const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss);
   downloadHtml(htmlContent, `${filename}.html`);
 }
 
@@ -554,11 +612,14 @@ export async function exportToRevealZip(presentation) {
   const masterFormatting = presentation?.slideset?.master?.formatting ?? {};
   const masterElementsHtml = buildMasterElementsHtml(presentation, masterFormatting, getSrc);
 
+  const fontMap = await resolveFontsForZip(presentation?.slideset?.fonts);
+  const fontFaceCss = buildFontFaceCss(fontMap);
+
   const slideSections = slides
     .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml))
     .join("\n");
 
-  const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections);
+  const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss);
 
   const zip = new JSZip();
   zip.file("index.html", htmlContent);
@@ -569,6 +630,12 @@ export async function exportToRevealZip(presentation) {
 
   for (const [, resolved] of resolvedMap) {
     if (resolved.blob && resolved.src.startsWith("media/")) {
+      zip.file(resolved.src, resolved.blob);
+    }
+  }
+
+  for (const [, resolved] of fontMap) {
+    if (resolved.blob && resolved.src.startsWith("fonts/")) {
       zip.file(resolved.src, resolved.blob);
     }
   }

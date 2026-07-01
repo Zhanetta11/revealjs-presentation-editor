@@ -1,16 +1,19 @@
 import "./StatusBar.css";
+import { isElectron } from "../../core/platform/electron";
 
 const SAVE_STATUS_LABEL = {
   pending: "Unsaved changes",
   saving: "Saving…",
-  saved: "Saved",
   error: "Save failed",
 };
+
+const folderName = (folderPath) => folderPath?.split(/[/\\]/).filter(Boolean).pop();
 
 export default function StatusBar({
   selectedSlideIndex,
   totalSlides,
   saveStatus = "idle",
+  linkedFolderPath = null,
   zoom,
   onZoomChange,
   onZoomIn,
@@ -22,7 +25,9 @@ export default function StatusBar({
   commentCount = 0,
 }) {
   const displayZoom = Math.round(Number(zoom) || 0);
-  const saveStatusLabel = SAVE_STATUS_LABEL[saveStatus];
+  const saveStatusLabel = saveStatus === "saved"
+    ? (!isElectron() ? "Saved" : linkedFolderPath ? `Saved to "${folderName(linkedFolderPath)}"` : "Saved (draft)")
+    : SAVE_STATUS_LABEL[saveStatus];
 
   return (
     <footer className="status-bar">

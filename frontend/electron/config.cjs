@@ -5,6 +5,10 @@ const schema = {
     type: 'array',
     default: [],
   },
+  linkedPresentationIds: {
+    type: 'array',
+    default: [],
+  },
   windowState: {
     type: 'object',
     properties: {

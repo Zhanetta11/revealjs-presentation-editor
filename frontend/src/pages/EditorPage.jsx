@@ -354,6 +354,7 @@ export default function EditorPage() {
           selectedSlideIndex={ctrl.selectedSlideIndex}
           totalSlides={ctrl.slides.length}
           saveStatus={ctrl.saveStatus}
+          linkedFolderPath={ctrl.linkedFolderPath}
           zoom={ctrl.zoom}
           onZoomChange={ctrl.setZoom}
           onZoomIn={ctrl.zoomIn}

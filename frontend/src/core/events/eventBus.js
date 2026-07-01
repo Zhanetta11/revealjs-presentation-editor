@@ -26,8 +26,12 @@ export const createEventBus = (dispatchAndCommit, getState, { storageKey, onSave
           const state = getState();
           if (!state) return;
 
-          if (state.autosaveEnabled && autosave.shouldAutosave(event.type)) {
-            autosave.scheduleAutosave(event.type);
+          if (autosave.shouldAutosave(event.type)) {
+            if (state.autosaveEnabled) {
+              autosave.scheduleAutosave(event.type);
+            } else {
+              onSaveStatusChange?.("pending");
+            }
           }
         }
       } catch (error) {

@@ -153,6 +153,7 @@ function createWindow() {
         return;
       }
       flushInProgress = false;
+      if (result.cancelled) return;
       await dialog.showMessageBox(mainWindow, {
         type: 'error',
         title: 'Could not save presentation',
@@ -298,6 +299,21 @@ ipcMain.handle('dialog:showMessage', async (event, title, message) => {
   });
 });
 
+ipcMain.handle('dialog:confirmSaveBeforeQuit', async (event, folderName) => {
+  requireTrustedSender(event);
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Unsaved Changes',
+    message: folderName
+      ? `You have unsaved changes in "${folderName}". Save before closing?`
+      : 'You have unsaved changes. Save before closing?',
+    buttons: ['Save', "Don't Save", 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+  });
+  return ['save', 'discard', 'cancel'][result.response] ?? 'cancel';
+});
+
 ipcMain.handle('file:readFile', async (event, filePath) => {
   try {
     const authorizedPath = requireAllowedPath(event, filePath, allowedReadPaths);
@@ -346,6 +362,13 @@ function recordRecentProject(projectFolder) {
   const recent = config.get('recentProjects', []).filter((p) => p !== projectFolder);
   recent.unshift(projectFolder);
   config.set('recentProjects', recent.slice(0, MAX_RECENT_PROJECTS));
+}
+
+function markPresentationLinked(presentationId) {
+  const linked = config.get('linkedPresentationIds', []);
+  if (!linked.includes(presentationId)) {
+    config.set('linkedPresentationIds', [...linked, presentationId]);
+  }
 }
 
 async function chooseNewProjectFolder(presentationTitle) {
@@ -398,6 +421,7 @@ ipcMain.handle('project:save', async (event, { presentationId, presentationTitle
       }
     }
     recordRecentProject(folder);
+    markPresentationLinked(presentationId);
     logger.info('Project files written successfully', { folder, count: files.length });
     return folder;
   } catch (err) {
@@ -454,6 +478,17 @@ ipcMain.handle('project:linkPresentation', async (event, presentationId, project
     throw new Error('This project is not in the recent list.');
   }
   linkedProjectFolders.set(presentationId, projectFolder);
+  markPresentationLinked(presentationId);
+});
+
+ipcMain.handle('project:getLinkedFolder', async (event, presentationId) => {
+  requireTrustedSender(event);
+  return linkedProjectFolders.get(presentationId) || null;
+});
+
+ipcMain.handle('project:getLinkedIds', async (event) => {
+  requireTrustedSender(event);
+  return config.get('linkedPresentationIds', []);
 });
 
 let storageFolderPromise = null;

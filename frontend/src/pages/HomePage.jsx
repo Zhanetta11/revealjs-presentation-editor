@@ -42,12 +42,23 @@ function useRecentProjects() {
 export default function HomePage() {
   const navigate = useNavigate();
   const [presentations, setPresentations] = useState([]);
+  const [linkedIds, setLinkedIds] = useState([]);
   const { projects: recentProjects, refresh: refreshRecentProjects } = useRecentProjects();
 
+  const refreshPresentations = () => getIndex().then(setPresentations);
+
   useEffect(() => {
-    if (isElectron()) return;
-    getIndex().then(setPresentations);
+    refreshPresentations();
   }, []);
+
+  useEffect(() => {
+    if (!isElectron()) return;
+    getElectronAPI().getLinkedPresentationIds().then(setLinkedIds);
+  }, []);
+
+  const draftPresentations = isElectron()
+    ? presentations.filter((p) => !linkedIds.includes(p.id))
+    : [];
 
   useEffect(() => {
     if (!isElectron()) return;
@@ -119,6 +130,42 @@ export default function HomePage() {
             </button>
           </div>
         </section>
+
+        {/* Unsaved drafts section (Electron only) */}
+        {isElectron() && draftPresentations.length > 0 && (
+          <section className="home-section">
+            <h2>Unsaved Drafts</h2>
+            <p className="home-empty">
+              These presentations were never saved to a file. Open one and use Save to keep it.
+            </p>
+            <ul className="home-recent-list">
+              {draftPresentations.map((p) => (
+                <li
+                  key={p.id}
+                  className="home-recent-item"
+                  onClick={() => handleOpen(p.id)}
+                >
+                  <div className="home-recent-thumb">
+                    <span>📄</span>
+                  </div>
+                  <div className="home-recent-info">
+                    <span className="home-recent-title">{p.title}</span>
+                    <span className="home-recent-date">
+                      {formatDate(p.updatedAt)}
+                    </span>
+                  </div>
+                  <button
+                    className="home-recent-delete"
+                    onClick={(e) => handleDelete(e, p.id)}
+                    title="Delete"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Recent section */}
         <section className="home-section">

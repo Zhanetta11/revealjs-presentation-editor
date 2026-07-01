@@ -12,9 +12,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openRecentProject: (projectFolder) => ipcRenderer.invoke('project:openRecent', projectFolder),
   removeRecentProject: (projectFolder) => ipcRenderer.invoke('project:removeRecent', projectFolder),
   linkPresentation: (presentationId, projectFolder) => ipcRenderer.invoke('project:linkPresentation', presentationId, projectFolder),
+  getLinkedFolder: (presentationId) => ipcRenderer.invoke('project:getLinkedFolder', presentationId),
+  getLinkedPresentationIds: () => ipcRenderer.invoke('project:getLinkedIds'),
 
   showError: (title, message) => ipcRenderer.invoke('dialog:showError', title, message),
   showMessage: (title, message) => ipcRenderer.invoke('dialog:showMessage', title, message),
+  confirmSaveBeforeQuit: (folderName) => ipcRenderer.invoke('dialog:confirmSaveBeforeQuit', folderName),
 
   storageGet: (key) => ipcRenderer.invoke('storage:get', key),
   storageSet: (key, payload) => ipcRenderer.invoke('storage:set', key, payload),
@@ -55,5 +58,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   notifyQuitReady: (success = true, message = '') =>
     ipcRenderer.send('app:quitReady', { success: Boolean(success), message: String(message) }),
+  cancelQuit: () => ipcRenderer.send('app:quitReady', { success: false, cancelled: true }),
 
 });

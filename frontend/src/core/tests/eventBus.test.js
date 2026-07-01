@@ -146,7 +146,7 @@ describe("createEventBus", () => {
     expect(autosave.saveImmediately).not.toHaveBeenCalled();
   });
 
-  test("dispatch does not autosave when autosave is disabled", async () => {
+  test("dispatch does not schedule an autosave when autosave is disabled", async () => {
     getState.mockReturnValue({
         autosaveEnabled: false,
         presentation: {
@@ -163,7 +163,23 @@ describe("createEventBus", () => {
 
     await eventBus.dispatch(event);
 
-    expect(autosave.shouldAutosave).not.toHaveBeenCalled();
     expect(autosave.scheduleAutosave).not.toHaveBeenCalled();
     });
+
+  test("dispatch still marks pending status when autosave is disabled", async () => {
+    const onSaveStatusChange = vi.fn();
+    getState.mockReturnValue({
+      autosaveEnabled: false,
+      presentation: {
+        slideset: {
+          slides: [],
+        },
+      },
+    });
+    const busWithStatus = createEventBus(reactDispatch, getState, { onSaveStatusChange });
+
+    await busWithStatus.dispatch({ type: EditorEventType.SLIDE.ADD, payload: {} });
+
+    expect(onSaveStatusChange).toHaveBeenCalledWith("pending");
+  });
 });

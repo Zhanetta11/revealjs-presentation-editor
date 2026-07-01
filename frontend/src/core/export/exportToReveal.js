@@ -32,6 +32,9 @@ import { downloadBackend } from "./downloadBackend";
 import { getMediaFile } from "../persistence/persistenceFacade";
 import { fontFormat, fontExtension } from "../utils/fontFormat";
 import JSZip from "jszip";
+import revealJsSource from "../../assets/reveal-dist/reveal.js?raw";
+import revealCssSource from "../../assets/reveal-dist/reveal.css?raw";
+import revealThemeCssSource from "../../assets/reveal-dist/theme/white.css?raw";
 
 function buildColorThemeCss(presentation) {
   const colorTheme = presentation?.slideset?.master?.["color-theme"] ?? [];
@@ -529,14 +532,19 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
     </section>`;
 }
 
-function buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss = "") {
+function buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss = "", revealAssets = {}) {
+  const {
+    cssTag = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css">`,
+    themeCssTag = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/white.css">`,
+    scriptTag = `<script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>`,
+  } = revealAssets;
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>${title}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/white.css">
+  ${cssTag}
+  ${themeCssTag}
   <style>
     ${fontFaceCss}
     ${colorThemeCss}
@@ -553,7 +561,7 @@ function buildHtmlContent(title, colorThemeCss, width, height, slideSections, fo
       ${slideSections}
     </div>
   </div>
-<script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
+${scriptTag}
   <script>
     Reveal.initialize({
       controls: true,
@@ -627,13 +635,20 @@ export async function exportToRevealZip(presentation) {
     .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml))
     .join("\n");
 
-  const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss);
+  const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss, {
+    cssTag: `<link rel="stylesheet" href="reveal/reveal.css">`,
+    themeCssTag: `<link rel="stylesheet" href="reveal/theme/white.css">`,
+    scriptTag: `<script src="reveal/reveal.js"></script>`,
+  });
 
   const zip = new JSZip();
   zip.file("index.html", htmlContent);
+  zip.file("reveal/reveal.js", revealJsSource);
+  zip.file("reveal/reveal.css", revealCssSource);
+  zip.file("reveal/theme/white.css", revealThemeCssSource);
   zip.file(
     "README.txt",
-    `${title}\n\nOpen index.html in a web browser to view the presentation.\nRequires an internet connection for reveal.js (loaded from CDN).\n`
+    `${title}\n\nOpen index.html in a web browser to view the presentation.\nWorks fully offline - reveal.js is bundled in the "reveal" folder, no internet connection required.\n`
   );
 
   for (const [, resolved] of resolvedMap) {

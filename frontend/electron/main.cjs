@@ -360,24 +360,13 @@ ipcMain.handle('file:writeLinkedFile', async (event, content) => {
 
 let storageFolderPromise = null;
 
-async function ensureStorageFolder() {
-  const saved = config.get('storageFolder');
-  if (saved && fs.existsSync(saved)) return saved;
+const AUTOSAVE_CACHE_FOLDER = path.join(userDataPath, 'autosave-cache');
 
+async function ensureStorageFolder() {
   if (!storageFolderPromise) {
     storageFolderPromise = (async () => {
-      const result = await dialog.showOpenDialog(mainWindow, {
-        title: 'Choose a folder to store your presentations',
-        properties: ['openDirectory', 'createDirectory'],
-      });
-      if (result.canceled || !result.filePaths[0]) {
-        throw new Error('A storage folder is required to save presentations.');
-      }
-      const folder = result.filePaths[0];
-      await fs.promises.mkdir(path.join(folder, 'media'), { recursive: true });
-      config.set('storageFolder', folder);
-      logger.info('Storage folder selected', { folder });
-      return folder;
+      await fs.promises.mkdir(path.join(AUTOSAVE_CACHE_FOLDER, 'media'), { recursive: true });
+      return AUTOSAVE_CACHE_FOLDER;
     })().finally(() => {
       storageFolderPromise = null;
     });
@@ -387,6 +376,27 @@ async function ensureStorageFolder() {
 
 function isMediaKey(key) {
   return typeof key === 'string' && key.startsWith('media/');
+}
+
+const MIME_TYPES_BY_EXTENSION = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+};
+
+function mimeTypeForKey(key) {
+  const ext = key.split('.').pop()?.toLowerCase();
+  return MIME_TYPES_BY_EXTENSION[ext] || 'application/octet-stream';
 }
 
 async function resolveKeyPath(key) {
@@ -407,12 +417,9 @@ ipcMain.handle('storage:get', async (event, key) => {
   try {
     const filePath = await resolveKeyPath(key);
     if (isMediaKey(key)) {
-      const [bytes, type] = await Promise.all([
-        fs.promises.readFile(filePath).catch(() => null),
-        fs.promises.readFile(`${filePath}.type`, 'utf-8').catch(() => 'application/octet-stream'),
-      ]);
+      const bytes = await fs.promises.readFile(filePath).catch(() => null);
       if (!bytes) return null;
-      return { kind: 'binary', bytes: new Uint8Array(bytes), type };
+      return { kind: 'binary', bytes: new Uint8Array(bytes), type: mimeTypeForKey(key) };
     }
     const text = await fs.promises.readFile(filePath, 'utf-8').catch(() => null);
     if (text === null) return null;
@@ -430,7 +437,6 @@ ipcMain.handle('storage:set', async (event, key, payload) => {
     if (payload.kind === 'binary') {
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       await fs.promises.writeFile(filePath, Buffer.from(payload.bytes));
-      await fs.promises.writeFile(`${filePath}.type`, payload.type || 'application/octet-stream', 'utf-8');
     } else {
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       await fs.promises.writeFile(filePath, payload.text, 'utf-8');
@@ -446,9 +452,6 @@ ipcMain.handle('storage:remove', async (event, key) => {
   try {
     const filePath = await resolveKeyPath(key);
     await fs.promises.rm(filePath, { force: true });
-    if (isMediaKey(key)) {
-      await fs.promises.rm(`${filePath}.type`, { force: true });
-    }
   } catch (err) {
     logger.error('storage:remove failed', { key, error: err.message });
     throw new Error(`Failed to remove "${key}": ${err.message}`);
@@ -467,7 +470,7 @@ ipcMain.handle('storage:listKeys', async (event) => {
     const mediaDir = path.join(folder, 'media');
     const mediaEntries = await fs.promises.readdir(mediaDir, { withFileTypes: true }).catch(() => []);
     mediaEntries
-      .filter((entry) => entry.isFile() && !entry.name.endsWith('.type'))
+      .filter((entry) => entry.isFile())
       .forEach((entry) => keys.push(`media/${entry.name}`));
 
     return keys;

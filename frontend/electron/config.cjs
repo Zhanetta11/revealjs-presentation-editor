@@ -1,9 +1,6 @@
 const Store = require('electron-store').default || require('electron-store');
 
 const schema = {
-  storageFolder: {
-    type: 'string',
-  },
   windowState: {
     type: 'object',
     properties: {

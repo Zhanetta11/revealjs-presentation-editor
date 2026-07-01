@@ -1,17 +1,20 @@
 import { createPresentation, savePresentation } from "./persistenceFacade";
 import { DEFAULT_PRESENTATION_TITLE } from "../utils/presentationUtils";
+import { deserializePresentation } from "./serializationOperations";
+
+const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
 
 export const importPresentationFromJson = async (jsonText) => {
-  let data;
-  try {
-    data = JSON.parse(jsonText);
-  } catch {
-    throw new Error("Invalid JSON file — could not parse.");
+  if (typeof jsonText !== "string" || new Blob([jsonText]).size > MAX_IMPORT_BYTES) {
+    throw new Error("Presentation JSON must be text and no larger than 25 MB.");
   }
 
-  if (!data?.slideset) {
-    throw new Error("File does not appear to be a valid presentation (missing slideset).");
+  const result = deserializePresentation(jsonText);
+  if (!result.data || result.errors.length > 0) {
+    const details = result.errors.slice(0, 5).join("\n");
+    throw new Error(`Invalid presentation file.${details ? `\n${details}` : ""}`);
   }
+  const data = result.data;
 
   const title = data.slideset.title ?? data.slideset.filename ?? DEFAULT_PRESENTATION_TITLE;
   const id = await createPresentation(title);

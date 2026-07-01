@@ -5,7 +5,21 @@ import {
   LIST_MARKER_WIDTH_EM,
 } from "../utils/listUtils";
 
-const validStyleValue = (v) => (v != null && v !== "undefined" ? v : undefined);
+const validStyleValue = (v) => {
+  if (v == null || v === "undefined") return undefined;
+  if (typeof v === "string" && /[;{}<>]|url\s*\(/i.test(v)) return undefined;
+  return v;
+};
+
+export const isSafeLinkHref = (href) => {
+  if (typeof href !== "string" || href.length > 2048) return false;
+  try {
+    const protocol = new URL(href, globalThis.location?.origin ?? "http://localhost").protocol;
+    return ["http:", "https:", "mailto:", "tel:"].includes(protocol);
+  } catch {
+    return false;
+  }
+};
 
 export const RUN_ONLY_KEYS = new Set(["super-sub-script", "highlight"]);
 
@@ -274,29 +288,35 @@ export const resolveParagraphIndentStyles = (
 
 export const buildRunStyles = (runFormatting = {}) => {
   const styles = [];
-  if (runFormatting.weight != null) {
+  const weight = validStyleValue(runFormatting.weight);
+  const color = validStyleValue(runFormatting.color);
+  const size = validStyleValue(runFormatting.size);
+  const font = validStyleValue(runFormatting.font);
+  const decoration = validStyleValue(runFormatting["text-decoration"]);
+  const highlight = validStyleValue(runFormatting.highlight);
+  if (weight != null) {
     const w =
-      runFormatting.weight === true
+      weight === true
         ? "bold"
-        : runFormatting.weight === false
+        : weight === false
           ? "normal"
-          : runFormatting.weight;
+          : weight;
     styles.push(`font-weight:${w}`);
   }
   if (runFormatting.italics != null)
     styles.push(
       `font-style:${runFormatting.italics === true || runFormatting.italics === "italic" ? "italic" : "normal"}`,
     );
-  if (runFormatting.color) styles.push(`color:${runFormatting.color}`);
-  if (runFormatting.size) styles.push(`font-size:${runFormatting.size}`);
-  if (runFormatting.font && runFormatting.font !== "undefined") styles.push(`font-family:${runFormatting.font}`);
+  if (color) styles.push(`color:${color}`);
+  if (size) styles.push(`font-size:${size}`);
+  if (font) styles.push(`font-family:${font}`);
   if (
-    runFormatting["text-decoration"] &&
-    runFormatting["text-decoration"] !== "none"
+    decoration &&
+    decoration !== "none"
   )
-    styles.push(`text-decoration:${runFormatting["text-decoration"]}`);
-  if (runFormatting.highlight && runFormatting.highlight !== "transparent")
-    styles.push(`background-color:${runFormatting.highlight}`);
+    styles.push(`text-decoration:${decoration}`);
+  if (highlight && highlight !== "transparent")
+    styles.push(`background-color:${highlight}`);
   return styles.join(";");
 };
 
@@ -322,7 +342,8 @@ export const runsToHTML = (runs, fallbackFormatting) =>
           : superSub === "sub"
             ? "vertical-align:sub;font-size:0.75em"
             : "";
-      const linkStyle = run.link?.href
+      const safeHref = isSafeLinkHref(run.link?.href) ? run.link.href : null;
+      const linkStyle = safeHref
         ? [
             !runFmt.color ? "color:var(--link,#2563eb)" : "",
             !runFmt["text-decoration"] ? "text-decoration:underline" : "",
@@ -331,9 +352,9 @@ export const runsToHTML = (runs, fallbackFormatting) =>
         : "";
       const allStyles = [styles, superSubStyle, linkStyle].filter(Boolean).join(";");
       const text = escapeHtml(run.text ?? "");
-      if (run.link?.href) {
-        const title = `title="🔗 ${escapeHtml(run.link.href)}&#10;Ctrl+Click to follow link"`;
-        return `<span style="${allStyles}" ${title} data-link="${escapeHtml(run.link.href)}">${text}</span>`;
+      if (safeHref) {
+        const title = `title="🔗 ${escapeHtml(safeHref)}&#10;Ctrl+Click to follow link"`;
+        return `<span style="${allStyles}" ${title} data-link="${escapeHtml(safeHref)}">${text}</span>`;
       }
       return allStyles ? `<span style="${allStyles}">${text}</span>` : text;
     })

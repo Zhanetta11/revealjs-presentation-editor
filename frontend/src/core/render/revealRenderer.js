@@ -60,7 +60,10 @@ export function buildTextElementStyle(textElement, index, masterFormatting = {},
 
 export function styleToString(styleObj) {
   return Object.entries(styleObj)
-    .filter(([, v]) => v != null)
+    .filter(([, v]) =>
+      v != null
+      && !(typeof v === "string" && /["'<>]|url\s*\(/i.test(v)),
+    )
     .map(([k, v]) => {
       const prop = k.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
       return `${prop}: ${v}`;

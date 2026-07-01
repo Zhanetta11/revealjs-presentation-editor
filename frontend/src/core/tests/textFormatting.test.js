@@ -9,6 +9,7 @@ import {
   RUN_LEVEL_KEYS,
   buildRunStyles,
   computeCurrentFormatting,
+  runsToHTML,
 } from "../text/textFormatting";
 
 describe("key classification", () => {
@@ -301,6 +302,26 @@ describe("paragraphsToHTML", () => {
     );
     expect(html).toContain("width:1.8em");
     expect(html).toContain("+ 1.8em");
+  });
+});
+
+describe("safe rich-text HTML", () => {
+  it("does not render executable link protocols", () => {
+    const html = runsToHTML([
+      { text: "unsafe", formatting: {}, link: { href: "javascript:alert(1)" } },
+    ]);
+
+    expect(html).toBe("unsafe");
+    expect(html).not.toContain("javascript:");
+  });
+
+  it("drops injected CSS declarations", () => {
+    const html = runsToHTML([
+      { text: "safe", formatting: { color: 'red;background:url("https://example.test")' } },
+    ]);
+
+    expect(html).toBe("safe");
+    expect(html).not.toContain("background");
   });
 });
 

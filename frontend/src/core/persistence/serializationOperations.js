@@ -200,7 +200,27 @@ export const serializePresentation = (presentation) => {
 
 export const deserializePresentation = (jsonString) => {
   try {
-    const parsedPresentation = JSON.parse(jsonString);
+    const parsedPresentation = JSON.parse(jsonString, (key, value) => {
+      if (key === "__proto__" || key === "prototype" || key === "constructor") {
+        return undefined;
+      }
+      return value;
+    });
+    const stack = [{ value: parsedPresentation, depth: 0 }];
+    let nodeCount = 0;
+    while (stack.length > 0) {
+      const { value, depth } = stack.pop();
+      if (!value || typeof value !== "object") continue;
+      nodeCount += 1;
+      if (depth > 100 || nodeCount > 100_000) {
+        throw new Error("Presentation structure is too deeply nested or complex.");
+      }
+      Object.values(value).forEach((child) => {
+        if (child && typeof child === "object") {
+          stack.push({ value: child, depth: depth + 1 });
+        }
+      });
+    }
     const validationErrors = validateSlideset(parsedPresentation);
 
     if (validationErrors.length > 0) {
@@ -216,8 +236,8 @@ export const deserializePresentation = (jsonString) => {
   }
 };
 
-export const downloadPresentationAsJson = (presentation) => {
+export const downloadPresentationAsJson = async (presentation) => {
   const json = serializePresentation(presentation);
   const filename = presentation.slideset?.filename ?? "untitled-presentation";
-  downloadBackend.saveText(json, filename.endsWith(".json") ? filename : `${filename}.json`, "application/json");
+  await downloadBackend.saveText(json, filename.endsWith(".json") ? filename : `${filename}.json`, "application/json");
 };

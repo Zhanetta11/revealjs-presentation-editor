@@ -173,6 +173,20 @@ describe("serializationOperations", () => {
     expect(result.errors.length).toBeGreaterThan(0);
   });
 
+  test("drops prototype-pollution keys while loading", () => {
+    const presentation = createDefaultPresentation();
+    const json = JSON.stringify(presentation).replace(
+      '"slideset":{',
+      '"slideset":{"__proto__":{"polluted":true},',
+    );
+
+    const result = deserializePresentation(json);
+
+    expect(result.data).not.toBeNull();
+    expect(Object.prototype.polluted).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(result.data.slideset, "__proto__")).toBe(false);
+  });
+
   test("keeps validation errors for invalid presentation", () => {
     const invalidPresentation = {
       slideset: {

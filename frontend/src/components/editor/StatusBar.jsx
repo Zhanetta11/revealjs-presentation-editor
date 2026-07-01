@@ -1,8 +1,16 @@
 import "./StatusBar.css";
 
+const SAVE_STATUS_LABEL = {
+  pending: "Unsaved changes",
+  saving: "Saving…",
+  saved: "Saved",
+  error: "Save failed",
+};
+
 export default function StatusBar({
   selectedSlideIndex,
   totalSlides,
+  saveStatus = "idle",
   zoom,
   onZoomChange,
   onZoomIn,
@@ -14,6 +22,7 @@ export default function StatusBar({
   commentCount = 0,
 }) {
   const displayZoom = Math.round(Number(zoom) || 0);
+  const saveStatusLabel = SAVE_STATUS_LABEL[saveStatus];
 
   return (
     <footer className="status-bar">
@@ -21,6 +30,12 @@ export default function StatusBar({
         <span>
           Slide {selectedSlideIndex + 1} of {totalSlides}
         </span>
+
+        {saveStatusLabel && (
+          <span className={`save-status save-status-${saveStatus}`}>
+            {saveStatusLabel}
+          </span>
+        )}
 
         <button
           className={`status-button ${showComments ? "active" : ""}`}

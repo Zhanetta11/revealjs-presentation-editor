@@ -37,6 +37,15 @@
   background: #e5e5e5;
 }
 
+.save-status {
+  color: #777;
+}
+
+.save-status-error {
+  color: #c0392b;
+  font-weight: 600;
+}
+
 .view-icons {
   display: flex;
   gap: 10px;

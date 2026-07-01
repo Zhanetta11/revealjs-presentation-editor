@@ -104,6 +104,16 @@ describe("createEventBus", () => {
     expect(autosave.scheduleAutosave).not.toHaveBeenCalled();
   });
 
+  test("manual save failures are returned to the caller", async () => {
+    const error = new Error("IndexedDB is unavailable");
+    autosave.saveImmediately.mockRejectedValueOnce(error);
+
+    await expect(eventBus.dispatch({
+      type: EditorEventType.PRESENTATION.SAVE,
+      payload: {},
+    })).rejects.toThrow("IndexedDB is unavailable");
+  });
+
   test("dispatch persists the updated autosave setting", async () => {
     getState.mockReturnValue({
       autosaveEnabled: false,

@@ -11,6 +11,7 @@ const DEFAULT_AUTOSAVE_DELAY = 2000;
 const TEXT_UPDATE_AUTOSAVE_DELAY = 5000;
 
 const AUTO_SAVE_EVENTS = new Set([
+  EditorEventType.PRESENTATION.CREATE,
   EditorEventType.SLIDE.ADD,
   EditorEventType.SLIDE.DELETE,
   EditorEventType.SLIDE.DUPLICATE,
@@ -83,50 +84,101 @@ const AUTO_SAVE_EVENTS = new Set([
 
 const createDebounce = (fn, delay) => {
   let timer = null;
-  return () => {
+  let pending = null;
+
+  const schedule = () => {
     if (timer) clearTimeout(timer);
+    if (!pending) {
+      pending = {};
+      pending.promise = new Promise((resolve, reject) => {
+        pending.resolve = resolve;
+        pending.reject = reject;
+      });
+      pending.promise.catch(() => {});
+    }
     timer = setTimeout(() => {
-      fn();
       timer = null;
+      const current = pending;
+      pending = null;
+      Promise.resolve(fn()).then(current.resolve, current.reject);
     }, delay);
+    return pending.promise;
   };
+
+  schedule.flush = () => {
+    if (!timer) return Promise.resolve();
+    clearTimeout(timer);
+    timer = null;
+    const current = pending;
+    pending = null;
+    return Promise.resolve(fn()).then(current.resolve, current.reject);
+  };
+
+  schedule.cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    pending?.resolve();
+    pending = null;
+  };
+  schedule.hasPending = () => timer !== null;
+
+  return schedule;
 };
 
 export const createAutosaveService = (
   getState,
-  { storageKey = DEFAULT_STORAGE_KEY, delay = DEFAULT_AUTOSAVE_DELAY, onError } = {},
+  { storageKey = DEFAULT_STORAGE_KEY, delay = DEFAULT_AUTOSAVE_DELAY, onError, onStatusChange } = {},
 ) => {
   let saveQueue = Promise.resolve();
+  const setStatus = (status) => onStatusChange?.(status);
 
   const persist = () => {
-    saveQueue = saveQueue.then(async () => {
-      try {
-        const state = getState();
-        if (!state?.presentation) {
-          console.warn("[AutosaveService] No presentation state to save.");
-          return;
-        }
-        const id = storageKey.startsWith("presentation-") ? storageKey.slice("presentation-".length) : storageKey;
-        const title = state.presentation?.slideset?.filename ?? "Untitled Presentation";
+    setStatus("saving");
+    const task = saveQueue.then(async () => {
+      const state = getState();
+      if (!state?.presentation) {
+        throw new Error("No presentation state is available to save.");
+      }
+      const id = storageKey.startsWith("presentation-") ? storageKey.slice("presentation-".length) : storageKey;
+      const title = state.presentation?.slideset?.title
+        ?? state.presentation?.slideset?.filename
+        ?? "Untitled Presentation";
+      const write = async () => {
         await storageAdapter.set(storageKey, serializePresentation(state.presentation));
         await updateIndexEntry(id, title);
-        if (process.env.NODE_ENV === "development") {
-          console.log("[AutosaveService] Saved.");
-        }
-      } catch (error) {
-        console.error("[AutosaveService] Save failed:", error);
-        onError?.(error);
+      };
+      if (globalThis.navigator?.locks) {
+        await navigator.locks.request(`presentation-write:${storageKey}`, write);
+      } else {
+        await write();
+      }
+      if (import.meta.env.DEV) {
+        console.log("[AutosaveService] Saved.");
       }
     });
-    return saveQueue;
+    task.then(
+      () => setStatus("saved"),
+      (error) => {
+        console.error("[AutosaveService] Save failed:", error);
+        onError?.(error);
+        setStatus("error");
+      },
+    );
+    saveQueue = task.catch(() => {});
+    return task;
   };
 
   const scheduleAutosave = createDebounce(persist, delay);
   const scheduleTextAutosave = createDebounce(persist, TEXT_UPDATE_AUTOSAVE_DELAY);
-  const saveImmediately = () => persist();
+  const saveImmediately = async () => {
+    scheduleAutosave.cancel();
+    scheduleTextAutosave.cancel();
+    return persist();
+  };
   const shouldAutosave = (eventType) => AUTO_SAVE_EVENTS.has(eventType);
 
   const schedule = (eventType) => {
+    setStatus("pending");
     if (eventType === EditorEventType.TEXT.UPDATE_CONTENT) {
       scheduleTextAutosave();
     } else {
@@ -134,11 +186,28 @@ export const createAutosaveService = (
     }
   };
 
-  const persistAutosaveSetting = (enabled) => {
-    try { setSetting(AUTOSAVE_SETTING_KEY, String(enabled)); } catch (e) {
-      console.warn("[AutosaveService] Failed to persist autosave setting:", e);
-    }
+  const persistAutosaveSetting = (enabled) =>
+    Promise.resolve(setSetting(AUTOSAVE_SETTING_KEY, String(enabled)));
+
+  const flush = async () => {
+    const hasPending = scheduleAutosave.hasPending() || scheduleTextAutosave.hasPending();
+    scheduleAutosave.cancel();
+    scheduleTextAutosave.cancel();
+    if (hasPending) await persist();
+    await saveQueue;
   };
 
-  return { scheduleAutosave: schedule, saveImmediately, shouldAutosave, persistAutosaveSetting };
+  const dispose = () => {
+    scheduleAutosave.cancel();
+    scheduleTextAutosave.cancel();
+  };
+
+  return {
+    scheduleAutosave: schedule,
+    saveImmediately,
+    shouldAutosave,
+    persistAutosaveSetting,
+    flush,
+    dispose,
+  };
 };

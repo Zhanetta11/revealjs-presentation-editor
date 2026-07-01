@@ -1,26 +1,25 @@
 import { EditorEventType } from "./editorEvents";
 import { createAutosaveService } from "../persistence/autoSaveService";
 
-export const createEventBus = (reactDispatch, getState, { storageKey, onSaveError } = {}) => {
+export const createEventBus = (dispatchAndCommit, getState, { storageKey, onSaveError, onSaveStatusChange } = {}) => {
   const autosave = createAutosaveService(getState, {
     storageKey,
     onError: onSaveError,
+    onStatusChange: onSaveStatusChange,
   });
 
   return {
     async dispatch(event) {
-      if (process.env.NODE_ENV === "development") {
+      if (import.meta.env.DEV) {
         console.log(`[EventBus] → ${event.type}`);
       }
 
       try {
-        reactDispatch(event);
-
-        await new Promise((resolve) => queueMicrotask(resolve));
+        await dispatchAndCommit(event);
 
         if (event.type === EditorEventType.PRESENTATION.TOGGLE_AUTOSAVE) {
           const state = getState();
-          if (state) autosave.persistAutosaveSetting(state.autosaveEnabled);
+          if (state) await autosave.persistAutosaveSetting(state.autosaveEnabled);
         } else if (event.type === EditorEventType.PRESENTATION.SAVE) {
           await autosave.saveImmediately();
         } else {
@@ -33,7 +32,10 @@ export const createEventBus = (reactDispatch, getState, { storageKey, onSaveErro
         }
       } catch (error) {
         console.error(`[EventBus] Failed to dispatch ${event.type}:`, error);
+        throw error;
       }
     },
+    flush: () => autosave.flush(),
+    dispose: () => autosave.dispose(),
   };
 };

@@ -3,7 +3,7 @@ export const SLIDE_SIZES = [
   { label: "Standard (4:3)", aspectRatio: "4:3", width: 1024, height: 768 },
 ];
 
-export const ASPECT_RATIOS = SLIDE_SIZES.map(({ label: _, ...s }) => ({
+export const ASPECT_RATIOS = SLIDE_SIZES.map((s) => ({
   label: s.aspectRatio,
   width: s.width,
   height: s.height,

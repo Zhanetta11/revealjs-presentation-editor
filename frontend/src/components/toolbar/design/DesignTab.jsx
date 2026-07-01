@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import "./DesignTab.css";
 import { getAvailableFonts } from "../../../core/model/fontConfig";
-import { toHex6, toHex9 } from "../../../core/utils/colorUtils";
-import { DESIGN_THEMES, COLOR_SCHEMES, findActiveTheme, updateThemeBackground, applyColorSchemeToDesign, updateThemeBackgroundFromScheme, THEME_PALETTE_COLUMNS, STANDARD_COLORS } from "../../../core/model/designThemes";
+import { toHex6 } from "../../../core/utils/colorUtils";
+import { DESIGN_THEMES, COLOR_SCHEMES, findActiveTheme, applyColorSchemeToDesign, updateThemeBackgroundFromScheme, THEME_PALETTE_COLUMNS, STANDARD_COLORS } from "../../../core/model/designThemes";
 import { SLIDE_SIZES, clampSlideDimension } from "../../../core/model/slideSizes";
 import { renderShapes } from "../../../core/render/shapeRenderer";
 import { ColorsDropdown } from "./ColorsDropdown";
@@ -86,17 +86,13 @@ function ThemeThumbnail({ theme, isActive, onClick }) {
     );
 }
 
-function RightPanel({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions, onUpdateThemeColor, onApplySlideBackground, onApplyBgFillImage, onApplyBackgroundToAll, selectedSlide, activeTheme, currentColorSchemeId, onColorSchemeChange }) {
-    const [showPalette, setShowPalette] = useState(false);
+function RightPanel({ presentation, onApplyFont, onUpdateDimensions, onApplySlideBackground, onApplyBgFillImage, onApplyBackgroundToAll, selectedSlide, currentColorSchemeId, onColorSchemeChange }) {
     const [showSizeMenu, setShowSizeMenu] = useState(false);
     const [showCustomSize, setShowCustomSize] = useState(false);
     const [showFormatBg, setShowFormatBg] = useState(false);
     const sizeRef = useRef(null);
 
-    const colorTheme = presentation?.slideset?.master?.["color-theme"] ?? [];
     const currentFont = presentation?.slideset?.master?.formatting?.font ?? "Arial";
-    const bgEntry = colorTheme.find(e => e["css-variable-name"] === "bg-light");
-    const bgColor = toHex6(bgEntry?.color ?? "#ffffff");
 
     const currentW = presentation?.slideset?.master?.["slide-dimensions"]?.width ?? 1280;
     const currentH = presentation?.slideset?.master?.["slide-dimensions"]?.height ?? 720;
@@ -113,10 +109,6 @@ function RightPanel({ presentation, onApplyTheme, onApplyFont, onUpdateDimension
         document.addEventListener("mousedown", fn, true);
         return () => document.removeEventListener("mousedown", fn, true);
     }, []);
-
-    const applyBg = (hex6) => {
-        onApplyTheme(updateThemeBackground(colorTheme, toHex9(hex6)), presentation?.slideset?.master?.decorations);
-    };
 
     const applyPreset = (size) => {
         onUpdateDimensions({ width: size.width, height: size.height }, size.aspectRatio, "px");
@@ -256,7 +248,7 @@ function RightPanel({ presentation, onApplyTheme, onApplyFont, onUpdateDimension
     );
 }
 
-export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions, onUpdateThemeColor, onApplySlideBackground, onApplyBgFillImage, onApplyBackgroundToAll, selectedSlide }) {
+export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions, onApplySlideBackground, onApplyBgFillImage, onApplyBackgroundToAll, selectedSlide }) {
     const currentTheme = useMemo(
         () => presentation?.slideset?.master?.["color-theme"] ?? [],
         [presentation?.slideset?.master],
@@ -316,14 +308,11 @@ export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onU
 
             <RightPanel
                 presentation={presentation}
-                onApplyTheme={onApplyTheme}
                 onApplyFont={onApplyFont}
                 onUpdateDimensions={onUpdateDimensions}
-                onUpdateThemeColor={onUpdateThemeColor}
                 onApplySlideBackground={onApplySlideBackground}
                 onApplyBgFillImage={onApplyBgFillImage}
                 onApplyBackgroundToAll={onApplyBackgroundToAll}
-                activeTheme={activeTheme}
                 currentColorSchemeId={currentColorSchemeId}
                 onColorSchemeChange={handleColorSchemeSelect}
                 selectedSlide={selectedSlide}

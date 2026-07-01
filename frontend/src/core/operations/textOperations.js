@@ -1,4 +1,4 @@
-import { createId, createParagraphId, getSlides, setSlides } from "../utils/presentationUtils";
+import { createParagraphId, getSlides, setSlides } from "../utils/presentationUtils";
 import { applyFormattingToParagraphs, RUN_ONLY_KEYS, SHARED_KEYS } from "../text/textFormatting";
 
 export const CONTENT_PLACEHOLDER_PROMPTS = new Set([

@@ -3,15 +3,13 @@ import "./SlideMasterView.css";
 import { buildColorThemeStyle, buildTextElementStyle } from "../../core/render/revealRenderer";
 import SlideDecorations from "../canvas/SlideDecorations";
 import EditorCanvas from "../editor/EditorCanvas";
-import { ColorPalettePopup } from "../toolbar/design/DesignTab";
 import { ColorsDropdown } from "../toolbar/design/ColorsDropdown";
 import { DESIGN_THEMES, findActiveTheme, applyColorSchemeToDesign, updateThemeBackgroundFromScheme } from "../../core/model/designThemes";
 import { SLIDE_SIZES } from "../../core/model/slideSizes";
 import { getAvailableFonts } from "../../core/model/fontConfig";
 import { renderShapes } from "../../core/render/shapeRenderer";
-import { toHex6 } from "../../core/utils/colorUtils";
 import { hasTitle, hasFooters } from "../../core/operations/masterOperations";
-import { placeholderPromptText, createPlaceholderPseudoElement } from "../../core/operations/layoutOperations";
+import { createPlaceholderPseudoElement } from "../../core/operations/layoutOperations";
 import { paragraphsToHTML } from "../../core/text/textFormatting";
 import { getPlaceholderBackground, getPlaceholderPadding } from "../../core/render/slidesetRenderUtils";
 
@@ -308,7 +306,7 @@ function MasterThumb({ label, isSelected, onClick, presentation, layout, isMaste
 }
 
 export function SlideMasterRibbon({
-  onClose, presentation, onApplyTheme, onApplyBackground, onApplyFont, onUpdateDimensions,
+  onClose, presentation, onApplyTheme, onApplyFont, onUpdateDimensions,
   masterName, onRenameMaster, selectedMasterLayoutId, onInsertLayout, onRenameLayout,
   onDeleteLayout,
   onAddTextElement, onImageUpload, onVideoUpload,

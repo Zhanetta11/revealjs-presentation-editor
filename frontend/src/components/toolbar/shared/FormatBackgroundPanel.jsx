@@ -105,7 +105,7 @@ export default function FormatBackgroundPanel({
     const bg = slide?.contents?.background ?? null;
     const isImg = bg && typeof bg === "object" && bg.type === "image";
     const settings = isImg ? bg : {};
-    const effective = isImg ? null : (!bg || bg === "#FFFFFFFF" ? getThemeBgLight(presentation) : bg);
+    const effective = isImg ? null : (!bg || bg === "#FFFFFFFF" ? themeBgLight : bg);
     const p = parseStoredColor(effective);
     setFillTypeOverride(null);
     setSolidColor(p.hex);
@@ -116,15 +116,7 @@ export default function FormatBackgroundPanel({
     setOffsetTop(settings.offsetTop ?? 0);
     setOffsetBottom(settings.offsetBottom ?? 0);
     setScaleToCanvas(settings.fitToCanvas ?? false);
-  }, [slideId, slide?.contents?.background]);
-
-  useEffect(() => {
-    const bg = slide?.contents?.background ?? null;
-    const isImg = bg && typeof bg === "object" && bg.type === "image";
-    if (!isImg && (!bg || bg === "#FFFFFFFF")) {
-      setSolidColor(themeBgLight);
-    }
-  }, [themeBgLight]);
+  }, [slideId, slide?.contents?.background, themeBgLight]);
 
   const fileInputRef = useRef(null);
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import "./EditorCanvas.css";
 import { getSlideSize } from "../../core/render/slidesetRenderUtils";
 import { buildColorThemeStyle, buildAdjustedAnimationMap } from "../../core/render/revealRenderer";
@@ -130,12 +130,12 @@ export default function EditorCanvas({
   const { contextMenu, openContextMenu, closeContextMenu } =
     useCanvasContextMenu({ selectedElementIds, onSelectElement });
 
-  const suppressTargetRef = useRef(null);
+  const [suppressTarget, setSuppressTarget] = useState(null);
 
   const handleContextMenuLayoutText = useCallback(
     (el, event) => {
       if (onSuppressLayoutPlaceholder) {
-        suppressTargetRef.current = el;
+        setSuppressTarget(el);
         openContextMenu(event, el.id, "canvas");
       } else {
         onPromoteLayoutElement?.(el, "text");
@@ -189,7 +189,6 @@ export default function EditorCanvas({
     };
     textElements.forEach(addEl);
     mediaElements.forEach(addEl);
-    // Hidden elements still suppress layout decorations (e.g. a suppressor added by "delete placeholder")
     (slide?.contents?.text ?? []).filter((el) => el.hidden).forEach(addEl);
     (slide?.contents?.media ?? []).filter((el) => el.hidden).forEach(addEl);
     return ids;
@@ -594,7 +593,7 @@ export default function EditorCanvas({
           canPaste={canPaste}
           canUndo={canUndo}
           canRedo={canRedo}
-          onClose={() => { suppressTargetRef.current = null; closeContextMenu(); }}
+          onClose={() => { setSuppressTarget(null); closeContextMenu(); }}
           onUndo={onUndo}
           onRedo={onRedo}
           onCut={onCut}
@@ -602,8 +601,8 @@ export default function EditorCanvas({
           onPaste={onPaste}
           onPasteText={onPasteText}
           onPastePicture={onPastePicture}
-          onDelete={suppressTargetRef.current
-            ? () => { onSuppressLayoutPlaceholder?.(suppressTargetRef.current); suppressTargetRef.current = null; onSelectElement?.(null); closeContextMenu(); }
+          onDelete={suppressTarget
+            ? () => { onSuppressLayoutPlaceholder?.(suppressTarget); setSuppressTarget(null); onSelectElement?.(null); closeContextMenu(); }
             : onDeleteSelection}
           onSelectAll={onSelectAll}
           onBringToFront={onBringToFront}

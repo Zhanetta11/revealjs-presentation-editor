@@ -42,7 +42,8 @@ export const useApplyFormatting = ({
       }
 
       const fontSizeDelta = Number(updates["font-size-delta"] ?? 0);
-      const { "font-size-delta": _delta, ...updatesWithoutDelta } = updates;
+      const updatesWithoutDelta = { ...updates };
+      delete updatesWithoutDelta["font-size-delta"];
       const normalizedUpdates = fontSizeDelta
         ? {
             ...updatesWithoutDelta,
@@ -57,7 +58,6 @@ export const useApplyFormatting = ({
         : updatesWithoutDelta;
       const { runUpdates, paraUpdates } = splitFormattingUpdates(normalizedUpdates);
 
-      // element-level keys must always update the whole element, not just the cursor paragraph
       const ELEMENT_LEVEL_KEYS = new Set(["vertical-align"]);
       const elementUpdates = Object.fromEntries(Object.entries(paraUpdates).filter(([k]) => ELEMENT_LEVEL_KEYS.has(k)));
       const paragraphOnlyUpdates = Object.fromEntries(Object.entries(paraUpdates).filter(([k]) => !ELEMENT_LEVEL_KEYS.has(k)));
@@ -98,5 +98,7 @@ export const useApplyFormatting = ({
       updateTextElementFormatting,
       updateParagraphFormatting,
       setPendingFormatting,
+      activeSelectionRef,
+      editingTextElementIdRef,
     ],
   );

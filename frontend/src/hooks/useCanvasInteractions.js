@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { snapAngle, normalizeAngle, computeResize, getElementRotationAngle } from "../core/utils/canvasGeometry";
 
 export function useCanvasInteractions({
@@ -22,9 +22,6 @@ export function useCanvasInteractions({
   onCommitHistory,
   onCancelHistory,
 }) {
-  const [draggingElementId, setDraggingElementId] = useState(null);
-  const [draggingMediaId, setDraggingMediaId] = useState(null);
-  const [resizingState, setResizingState] = useState(null);
   const [rotatingElement, setRotatingElement] = useState(null);
   const [snapInfo, setSnapInfo] = useState(null);
 
@@ -33,30 +30,43 @@ export function useCanvasInteractions({
   const activeRef = useRef(null);
 
   const latestRef = useRef({});
-  latestRef.current = {
-    zoomScale,
-    width,
+  useLayoutEffect(() => {
+    latestRef.current = {
+      zoomScale,
+      width,
+      height,
+      textElements,
+      mediaElements,
+      onMoveTextElement,
+      onResizeTextElement,
+      onRotateTextElement,
+      onMoveMediaElement,
+      onResizeMediaElement,
+      onRotateMediaElement,
+      onCommitHistory,
+      onCancelHistory,
+    };
+  }, [
     height,
-    textElements,
     mediaElements,
-    onMoveTextElement,
-    onResizeTextElement,
-    onRotateTextElement,
-    onMoveMediaElement,
-    onResizeMediaElement,
-    onRotateMediaElement,
-    onCommitHistory,
     onCancelHistory,
-  };
+    onCommitHistory,
+    onMoveMediaElement,
+    onMoveTextElement,
+    onResizeMediaElement,
+    onResizeTextElement,
+    onRotateMediaElement,
+    onRotateTextElement,
+    textElements,
+    width,
+    zoomScale,
+  ]);
 
   const slideRectRef = useRef(null);
 
   const clearAll = useCallback(() => {
     activeRef.current = null;
     slideRectRef.current = null;
-    setDraggingElementId(null);
-    setDraggingMediaId(null);
-    setResizingState(null);
     setRotatingElement(null);
     setSnapInfo(null);
   }, []);
@@ -143,9 +153,11 @@ export function useCanvasInteractions({
   };
 
   useEffect(() => {
+    const moveHandler = windowMoveHandler.current;
+    const upHandler = windowUpHandler.current;
     return () => {
-      window.removeEventListener("mousemove", windowMoveHandler.current);
-      window.removeEventListener("mouseup", windowUpHandler.current);
+      window.removeEventListener("mousemove", moveHandler);
+      window.removeEventListener("mouseup", upHandler);
     };
   }, []);
 
@@ -168,7 +180,6 @@ export function useCanvasInteractions({
       activeRef.current = { kind: "drag-text", elementId: textElementId, offset };
       onBeginHistory?.();
       onSelectElement?.(textElementId, { preserveIfSelected: true });
-      setDraggingElementId(textElementId);
       attachListeners();
     },
     [textElements, onBeginHistory, onSelectElement, zoomScale],
@@ -193,7 +204,6 @@ export function useCanvasInteractions({
       activeRef.current = { kind: "drag-media", elementId: mediaId, offset };
       onBeginHistory?.();
       onSelectElement?.(mediaId, { preserveIfSelected: true });
-      setDraggingMediaId(mediaId);
       attachListeners();
     },
     [mediaElements, onBeginHistory, onSelectElement, zoomScale],
@@ -220,7 +230,6 @@ export function useCanvasInteractions({
       activeRef.current = { kind: "resize-text", resizing };
       onBeginHistory?.();
       onSelectElement?.(textElementId, { preserveIfSelected: true });
-      setResizingState({ type: "text", ...resizing });
       attachListeners();
     },
     [textElements, onBeginHistory, onSelectElement, zoomScale],
@@ -249,7 +258,6 @@ export function useCanvasInteractions({
       activeRef.current = { kind: "resize-media", resizing };
       onBeginHistory?.();
       onSelectElement?.(mediaId, { preserveIfSelected: true });
-      setResizingState({ type: "media", ...resizing });
       attachListeners();
     },
     [mediaElements, onBeginHistory, onSelectElement, zoomScale],

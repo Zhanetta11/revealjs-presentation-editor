@@ -8,3 +8,11 @@ createRoot(document.getElementById("root")).render(
     <App />
   </StrictMode>,
 );
+
+if (import.meta.env.PROD && location.protocol.startsWith("http") && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
+      console.warn("[Offline] Service worker registration failed:", error);
+    });
+  });
+}

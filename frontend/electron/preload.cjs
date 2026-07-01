@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRecentProjects: () => ipcRenderer.invoke('project:getRecent'),
   readProjectManifest: (projectFolder) => ipcRenderer.invoke('project:readManifest', projectFolder),
   openRecentProject: (projectFolder) => ipcRenderer.invoke('project:openRecent', projectFolder),
+  readProjectMediaFile: (projectFolder, relativePath) => ipcRenderer.invoke('project:readMediaFile', projectFolder, relativePath),
   removeRecentProject: (projectFolder) => ipcRenderer.invoke('project:removeRecent', projectFolder),
   linkPresentation: (presentationId, projectFolder) => ipcRenderer.invoke('project:linkPresentation', presentationId, projectFolder),
   getLinkedFolder: (presentationId) => ipcRenderer.invoke('project:getLinkedFolder', presentationId),

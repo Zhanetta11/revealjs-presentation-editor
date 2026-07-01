@@ -29,9 +29,7 @@ async function findAvailableSubfolder(parentHandle, baseName) {
     let existing = null;
     try {
       existing = await parentHandle.getDirectoryHandle(candidate);
-    } catch {
-      // Directory does not exist yet - candidate name is available.
-    }
+    } catch {}
     if (!existing || !(await isNonEmpty(existing))) return candidate;
     candidate = `${baseName} (${suffix})`;
     suffix += 1;
@@ -69,6 +67,17 @@ async function writeFileToFolder(folderHandle, relativePath, content) {
   const writable = await fileHandle.createWritable();
   await writable.write(content);
   await writable.close();
+}
+
+async function readFileFromFolder(folderHandle, relativePath) {
+  const segments = relativePath.split("/");
+  let dir = folderHandle;
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    dir = await dir.getDirectoryHandle(segments[i]);
+  }
+  const fileHandle = await dir.getFileHandle(segments[segments.length - 1]);
+  const file = await fileHandle.getFile();
+  return new Uint8Array(await file.arrayBuffer());
 }
 
 export async function saveProjectToBrowserFolder({ presentationId, presentationTitle, files, forceNewFolder }) {
@@ -124,6 +133,12 @@ export async function openBrowserRecentProject(recentId) {
   const fileHandle = await entry.handle.getFileHandle("presentation.json");
   const file = await fileHandle.getFile();
   return file.text();
+}
+
+export async function readMediaFileFromRecent(recentId, relativePath) {
+  const entry = await recentProjectsStore.get(recentId);
+  if (!entry) throw new Error("This project is not in the recent list.");
+  return readFileFromFolder(entry.handle, relativePath);
 }
 
 export async function linkBrowserRecentProject(presentationId, recentId) {

@@ -471,6 +471,24 @@ ipcMain.handle('project:openRecent', async (event, projectFolder) => {
   return text;
 });
 
+ipcMain.handle('project:readMediaFile', async (event, projectFolder, relativePath) => {
+  requireTrustedSender(event);
+  const recent = config.get('recentProjects', []);
+  if (!recent.includes(projectFolder)) {
+    throw new Error('This project is not in the recent list.');
+  }
+  if (typeof relativePath !== 'string' || relativePath.includes('..') || path.isAbsolute(relativePath)) {
+    throw new Error(`Invalid file path: ${relativePath}`);
+  }
+  const root = path.resolve(projectFolder);
+  const resolved = path.resolve(root, relativePath);
+  if (!resolved.startsWith(root + path.sep)) {
+    throw new Error(`Invalid file path: ${relativePath}`);
+  }
+  const bytes = await fs.promises.readFile(resolved);
+  return new Uint8Array(bytes);
+});
+
 ipcMain.handle('project:linkPresentation', async (event, presentationId, projectFolder) => {
   requireTrustedSender(event);
   const recent = config.get('recentProjects', []);

@@ -16,7 +16,9 @@ import {
   openBrowserRecentProject,
   linkBrowserRecentProject,
   removeBrowserRecentProject,
+  readMediaFileFromRecent,
 } from "../core/persistence/browserProjectFolder";
+import { rehydrateProjectManifestJson } from "../core/persistence/projectMediaRehydrate";
 
 const usesProjectFolders = () => isElectron() || supportsFileSystemAccess();
 
@@ -97,7 +99,11 @@ export default function HomePage() {
       const jsonText = isElectron()
         ? await getElectronAPI().openRecentProject(key)
         : await openBrowserRecentProject(key);
-      const id = await importPresentationFromJson(jsonText);
+      const readFile = isElectron()
+        ? (relativePath) => getElectronAPI().readProjectMediaFile(key, relativePath)
+        : (relativePath) => readMediaFileFromRecent(key, relativePath);
+      const rehydratedJsonText = await rehydrateProjectManifestJson(jsonText, readFile);
+      const id = await importPresentationFromJson(rehydratedJsonText);
       if (isElectron()) {
         await getElectronAPI().linkPresentation(id, key);
       } else {

@@ -5,8 +5,14 @@ const INDEX_KEY = "presentations_index";
 
 let indexQueue = Promise.resolve();
 const withIndexLock = (fn) => {
-  indexQueue = indexQueue.then(fn).catch((e) => { console.error("[presentationsLibrary] index write failed:", e); });
-  return indexQueue;
+  const run = () => globalThis.navigator?.locks
+    ? navigator.locks.request("presentation-index", fn)
+    : fn();
+  const task = indexQueue.then(run);
+  indexQueue = task.catch((e) => {
+    console.error("[presentationsLibrary] index write failed:", e);
+  });
+  return task;
 };
 
 export function presentationKey(id) {
@@ -66,11 +72,52 @@ export function updateIndexEntry(id, title) {
 export function deletePresentation(id) {
   return withIndexLock(async () => {
     const index = await getIndex();
+    const raw = await storageAdapter.get(presentationKey(id));
+    let presentation = null;
+    try {
+      presentation = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      // A corrupt presentation can still be deleted.
+    }
+    const mediaKeys = new Set();
+    const findMediaKeys = (value, target = mediaKeys) => {
+      if (Array.isArray(value)) return value.forEach((child) => findMediaKeys(child, target));
+      if (!value || typeof value !== "object") return;
+      for (const [key, child] of Object.entries(value)) {
+        if (
+          (key === "file-link" || key === "font-file")
+          && typeof child === "string"
+          && child.startsWith("indexeddb://")
+        ) {
+          target.add(child.slice("indexeddb://".length));
+        } else {
+          findMediaKeys(child, target);
+        }
+      }
+    };
+    findMediaKeys(presentation);
+    const otherPresentationKeys = (await storageAdapter.getAllKeys()).filter(
+      (key) => String(key).startsWith("presentation-") && key !== presentationKey(id),
+    );
+    for (const key of otherPresentationKeys) {
+      try {
+        const otherRaw = await storageAdapter.get(key);
+        const other = typeof otherRaw === "string" ? JSON.parse(otherRaw) : otherRaw;
+        const sharedKeys = new Set();
+        findMediaKeys(other, sharedKeys);
+        sharedKeys.forEach((sharedKey) => mediaKeys.delete(sharedKey));
+      } catch {
+        // Preserve assets if another presentation cannot be inspected safely.
+        mediaKeys.clear();
+        break;
+      }
+    }
     await storageAdapter.set(
       INDEX_KEY,
       index.filter((p) => p.id !== id),
     );
     await storageAdapter.remove(presentationKey(id));
+    await Promise.all([...mediaKeys].map((key) => storageAdapter.remove(key)));
   });
 }
 

@@ -9,9 +9,19 @@ function openDB() {
     dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (e) => {
-        e.target.result.createObjectStore(STORE_NAME);
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
       };
-      request.onsuccess = (e) => resolve(e.target.result);
+      request.onsuccess = (e) => {
+        const db = e.target.result;
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
+      };
       request.onerror = (e) => {
         dbPromise = null;
         reject(e.target.error);

@@ -103,6 +103,21 @@ const readImageDimensionsFromFile = (file) =>
     image.src = url;
   });
 
+const readVideoDimensionsFromFile = (file) =>
+  new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.onloadedmetadata = () => {
+      resolve({ width: video.videoWidth, height: video.videoHeight });
+      URL.revokeObjectURL(url);
+    };
+    video.onerror = () => {
+      resolve({ width: 480, height: 270 });
+      URL.revokeObjectURL(url);
+    };
+    video.src = url;
+  });
+
 const fitImageToSlide = (width, height, slideWidth, slideHeight) => {
   const maxW = slideWidth * 0.35;
   const maxH = slideHeight * 0.35;
@@ -1238,14 +1253,25 @@ useEffect(() => {
   const handlePlaceholderVideoUpload = useCallback(
     async (placeholderElement, file) => {
       if (!placeholderElement || !file?.type?.startsWith("video/")) return;
-      const { mediaId, key } = await storeMediaFile(file);
+      const [{ mediaId, key }, naturalSize] = await Promise.all([
+        storeMediaFile(file),
+        readVideoDimensionsFromFile(file),
+      ]);
+      const phW = placeholderElement.width ?? naturalSize.width;
+      const phH = placeholderElement.height ?? naturalSize.height;
+      const scale = Math.min(phW / naturalSize.width, phH / naturalSize.height);
+      const fitW = Math.round(naturalSize.width * scale);
+      const fitH = Math.round(naturalSize.height * scale);
+      const phPos = placeholderElement.position ?? { x: 60, y: 60 };
+      const fitX = Math.round(phPos.x + (phW - fitW) / 2);
+      const fitY = Math.round(phPos.y + (phH - fitH) / 2);
       beginHistory();
       addMedia({
-        ...createVideoMediaElement(mediaId, key),
+        ...createVideoMediaElement(mediaId, key, { width: fitW, height: fitH }),
         "placeholder-id": placeholderElement["placeholder-id"],
-        position: { ...(placeholderElement.position ?? { x: 60, y: 60 }) },
-        width: placeholderElement.width ?? 480,
-        height: placeholderElement.height ?? 270,
+        position: { x: fitX, y: fitY },
+        width: fitW,
+        height: fitH,
         "z-index": placeholderElement["z-index"] ?? 1,
       });
       updateElement(placeholderElement.id, { hidden: true });
@@ -1360,6 +1386,25 @@ useEffect(() => {
     [selectedElementId, updateRunLink],
   );
 
+  const [linkedFolderPath, setLinkedFolderPath] = useState(null);
+  const linkedFolderPathRef = useRef(null);
+  useEffect(() => {
+    linkedFolderPathRef.current = linkedFolderPath;
+  }, [linkedFolderPath]);
+
+  const saveStatusRef = useRef(saveStatus);
+  useEffect(() => {
+    saveStatusRef.current = saveStatus;
+  }, [saveStatus]);
+
+  useEffect(() => {
+    if (!isElectron() || !presentationId) return;
+    getElectronAPI()
+      .getLinkedFolder(presentationId)
+      .then(setLinkedFolderPath)
+      .catch(() => setLinkedFolderPath(null));
+  }, [presentationId]);
+
   const saveProjectToFolder = useCallback(
     async (forceNewFolder) => {
       const api = getElectronAPI();
@@ -1380,6 +1425,7 @@ useEffect(() => {
           ...mediaFileEntries,
         ],
       });
+      if (savedFolder) setLinkedFolderPath(savedFolder);
       return Boolean(savedFolder);
     },
     [presentation, presentationId],
@@ -1466,6 +1512,25 @@ useEffect(() => {
         }
       }),
       api.onBeforeQuit(async () => {
+        const hasUnsavedChanges = saveStatusRef.current === "pending" || saveStatusRef.current === "saving";
+        const folder = linkedFolderPathRef.current;
+
+        if (folder && hasUnsavedChanges) {
+          const folderName = folder.split(/[/\\]/).filter(Boolean).pop();
+          const choice = await api.confirmSaveBeforeQuit(folderName);
+          if (choice === "cancel") {
+            api.cancelQuit();
+            return;
+          }
+          if (choice === "save") {
+            const saved = await saveProjectToFolder(false).catch(() => false);
+            if (!saved) {
+              api.notifyQuitReady(false, "The presentation could not be saved.");
+              return;
+            }
+          }
+        }
+
         const result = await savePresentation({ silent: true });
         if (result.success) {
           api.notifyQuitReady(true);
@@ -1478,7 +1543,7 @@ useEffect(() => {
       }),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [handleNew, handleElectronOpen, savePresentation, handleSave, handleSaveAs, handleLoadFile]);
+  }, [handleNew, handleElectronOpen, savePresentation, handleSave, handleSaveAs, handleLoadFile, saveProjectToFolder]);
 
   const handleDeleteAndGoHome = useCallback(async () => {
     if (!presentationId) return;
@@ -2043,6 +2108,7 @@ useEffect(() => {
   return {
     isLoading,
     saveStatus,
+    linkedFolderPath,
 
     state,
     presentation,

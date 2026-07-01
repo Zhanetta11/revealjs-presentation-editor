@@ -66,13 +66,15 @@ export const createImageMediaElement = (mediaId, key, { width = 300, height = 20
   playback: {},
 });
 
-export const createVideoMediaElement = (mediaId, key) => ({
+export const createVideoMediaElement = (mediaId, key, { width = 480, height = 270 } = {}) => ({
   id: mediaId,
   "file-link": `indexeddb://${key}`,
   "media-type": "video",
   position: { x: 60, y: 60 },
-  width: 480,
-  height: 270,
+  width,
+  height,
+  "source-width": width,
+  "source-height": height,
   rotation: 0,
   "z-index": 1,
   scale: 1,

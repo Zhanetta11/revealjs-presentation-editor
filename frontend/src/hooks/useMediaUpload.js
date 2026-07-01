@@ -18,6 +18,22 @@ function readImageDimensions(file) {
   });
 }
 
+function readVideoDimensions(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.onloadedmetadata = () => {
+      resolve({ width: video.videoWidth, height: video.videoHeight });
+      URL.revokeObjectURL(url);
+    };
+    video.onerror = () => {
+      resolve({ width: 480, height: 270 });
+      URL.revokeObjectURL(url);
+    };
+    video.src = url;
+  });
+}
+
 function fitToSlide(width, height, slideWidth, slideHeight) {
   const maxW = slideWidth * 0.3;
   const maxH = slideHeight * 0.3;
@@ -48,11 +64,15 @@ export function useMediaUpload(addMedia, slideWidth = 1280, slideHeight = 720) {
       const file = event.target.files?.[0];
       if (!file || !file.type.startsWith("video/")) return;
 
-      const { mediaId, key } = await storeMediaFile(file);
-      addMedia(createVideoMediaElement(mediaId, key));
+      const [{ mediaId, key }, dims] = await Promise.all([
+        storeMediaFile(file),
+        readVideoDimensions(file),
+      ]);
+      const scaledDims = fitToSlide(dims.width, dims.height, slideWidth, slideHeight);
+      addMedia(createVideoMediaElement(mediaId, key, scaledDims));
       event.target.value = "";
     },
-    [addMedia],
+    [addMedia, slideWidth, slideHeight],
   );
 
   return { handleImageUpload, handleVideoUpload };

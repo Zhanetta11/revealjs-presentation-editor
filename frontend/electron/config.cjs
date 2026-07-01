@@ -1,6 +1,10 @@
 const Store = require('electron-store').default || require('electron-store');
 
 const schema = {
+  recentProjects: {
+    type: 'array',
+    default: [],
+  },
   windowState: {
     type: 'object',
     properties: {

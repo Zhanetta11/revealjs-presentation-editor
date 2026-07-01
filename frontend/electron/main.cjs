@@ -10,7 +10,7 @@ const devtools = isDev ? require('./devtools.cjs') : null;
 let mainWindow;
 let readyToClose = false;
 let flushInProgress = false;
-let linkedFilePath = null;
+const linkedProjectFolders = new Map();
 const allowedReadPaths = new Set();
 const allowedWritePaths = new Set();
 
@@ -63,7 +63,7 @@ function createWindow() {
   logger.info('Creating main window');
   readyToClose = false;
   flushInProgress = false;
-  linkedFilePath = null;
+  linkedProjectFolders.clear();
   ipcMain.removeAllListeners('app:quitReady');
   allowedReadPaths.clear();
   allowedWritePaths.clear();
@@ -270,7 +270,7 @@ const SAVE_FILTERS = {
   zip: [{ name: 'ZIP Archive', extensions: ['zip'] }],
 };
 
-ipcMain.handle('dialog:saveFile', async (event, defaultName, extension, options = {}) => {
+ipcMain.handle('dialog:saveFile', async (event, defaultName, extension) => {
   requireTrustedSender(event);
   logger.debug('Save file dialog requested', { defaultName, extension });
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -278,11 +278,7 @@ ipcMain.handle('dialog:saveFile', async (event, defaultName, extension, options 
     filters: SAVE_FILTERS[extension] || SAVE_FILTERS.json,
   });
   if (result.filePath) {
-    const normalized = normalizeFilePath(result.filePath);
-    allowedWritePaths.add(normalized);
-    if (options?.linkAsSaveTarget) {
-      linkedFilePath = normalized;
-    }
+    allowedWritePaths.add(normalizeFilePath(result.filePath));
     logger.info('File save path selected', { path: result.filePath });
   }
   return result.filePath;
@@ -336,26 +332,128 @@ ipcMain.handle('file:writeFile', async (event, filePath, content) => {
   }
 });
 
-ipcMain.handle('file:writeLinkedFile', async (event, content) => {
+function sanitizeFolderName(name) {
+  const cleaned = String(name || 'Untitled Presentation')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, ' ')
+    .trim()
+    .slice(0, 100);
+  return cleaned || 'Untitled Presentation';
+}
+
+const MAX_RECENT_PROJECTS = 10;
+
+function recordRecentProject(projectFolder) {
+  const recent = config.get('recentProjects', []).filter((p) => p !== projectFolder);
+  recent.unshift(projectFolder);
+  config.set('recentProjects', recent.slice(0, MAX_RECENT_PROJECTS));
+}
+
+async function chooseNewProjectFolder(presentationTitle) {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose where to save this presentation',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+
+  const folderName = sanitizeFolderName(presentationTitle);
+  let projectFolder = path.join(result.filePaths[0], folderName);
+  let suffix = 1;
+  while (fs.existsSync(projectFolder) && (await fs.promises.readdir(projectFolder)).length > 0) {
+    projectFolder = path.join(result.filePaths[0], `${folderName} (${suffix})`);
+    suffix += 1;
+  }
+
+  await fs.promises.mkdir(path.join(projectFolder, 'media', 'image'), { recursive: true });
+  await fs.promises.mkdir(path.join(projectFolder, 'media', 'video'), { recursive: true });
+  await fs.promises.mkdir(path.join(projectFolder, 'fonts'), { recursive: true });
+  return projectFolder;
+}
+
+ipcMain.handle('project:save', async (event, { presentationId, presentationTitle, files, forceNewFolder } = {}) => {
   requireTrustedSender(event);
-  if (!linkedFilePath) {
-    throw new Error('No linked file has been chosen yet.');
-  }
+  if (!presentationId) throw new Error('Missing presentation id.');
   try {
-    if (typeof content !== 'string' && !ArrayBuffer.isView(content)) {
-      throw new Error('Unsupported file content type.');
+    let folder = linkedProjectFolders.get(presentationId);
+    if (forceNewFolder || !folder) {
+      const chosen = await chooseNewProjectFolder(presentationTitle);
+      if (!chosen) return null;
+      folder = chosen;
+      linkedProjectFolders.set(presentationId, folder);
     }
-    logger.debug('Writing linked file', { path: linkedFilePath, size: content.length });
-    await fs.promises.writeFile(
-      linkedFilePath,
-      content,
-      typeof content === 'string' ? 'utf-8' : undefined,
-    );
-    logger.info('Linked file written successfully', { path: linkedFilePath });
+
+    const root = path.resolve(folder);
+    for (const file of files) {
+      if (typeof file.relativePath !== 'string' || file.relativePath.includes('..') || path.isAbsolute(file.relativePath)) {
+        throw new Error(`Invalid file path: ${file.relativePath}`);
+      }
+      const resolved = path.resolve(root, file.relativePath);
+      if (!resolved.startsWith(root + path.sep)) {
+        throw new Error(`Invalid file path: ${file.relativePath}`);
+      }
+      await fs.promises.mkdir(path.dirname(resolved), { recursive: true });
+      if (file.kind === 'binary') {
+        await fs.promises.writeFile(resolved, Buffer.from(file.bytes));
+      } else {
+        await fs.promises.writeFile(resolved, file.text, 'utf-8');
+      }
+    }
+    recordRecentProject(folder);
+    logger.info('Project files written successfully', { folder, count: files.length });
+    return folder;
   } catch (err) {
-    logger.error('Failed to write linked file', { path: linkedFilePath, error: err.message });
-    throw new Error(`Failed to write file: ${err.message}`);
+    logger.error('Failed to save project', { error: err.message });
+    throw new Error(`Failed to save presentation: ${err.message}`);
   }
+});
+
+ipcMain.handle('project:getRecent', async (event) => {
+  requireTrustedSender(event);
+  const recent = config.get('recentProjects', []);
+  const existing = recent.filter((p) => fs.existsSync(path.join(p, 'presentation.json')));
+  if (existing.length !== recent.length) {
+    config.set('recentProjects', existing);
+  }
+  return existing;
+});
+
+ipcMain.handle('project:readManifest', async (event, projectFolder) => {
+  requireTrustedSender(event);
+  const recent = config.get('recentProjects', []);
+  if (!recent.includes(projectFolder)) {
+    throw new Error('This project is not in the recent list.');
+  }
+  const manifestPath = path.join(projectFolder, 'presentation.json');
+  const [text, stats] = await Promise.all([
+    fs.promises.readFile(manifestPath, 'utf-8'),
+    fs.promises.stat(manifestPath),
+  ]);
+  return { text, updatedAt: stats.mtimeMs };
+});
+
+ipcMain.handle('project:removeRecent', async (event, projectFolder) => {
+  requireTrustedSender(event);
+  const recent = config.get('recentProjects', []).filter((p) => p !== projectFolder);
+  config.set('recentProjects', recent);
+});
+
+ipcMain.handle('project:openRecent', async (event, projectFolder) => {
+  requireTrustedSender(event);
+  const recent = config.get('recentProjects', []);
+  if (!recent.includes(projectFolder)) {
+    throw new Error('This project is not in the recent list.');
+  }
+  const text = await fs.promises.readFile(path.join(projectFolder, 'presentation.json'), 'utf-8');
+  recordRecentProject(projectFolder);
+  return text;
+});
+
+ipcMain.handle('project:linkPresentation', async (event, presentationId, projectFolder) => {
+  requireTrustedSender(event);
+  const recent = config.get('recentProjects', []);
+  if (!recent.includes(projectFolder)) {
+    throw new Error('This project is not in the recent list.');
+  }
+  linkedProjectFolders.set(presentationId, projectFolder);
 });
 
 let storageFolderPromise = null;

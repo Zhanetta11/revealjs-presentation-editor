@@ -5,15 +5,47 @@ import {
   createPresentation,
   deletePresentation,
 } from "../core/persistence/persistenceFacade";
+import { importPresentationFromJson } from "../core/persistence/importPresentation";
 import "./HomePage.css";
 import { greeting as getGreeting, formatDate } from "../core/utils/dateUtils";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
 
+function useRecentProjects() {
+  const [projects, setProjects] = useState([]);
+
+  const refresh = async () => {
+    if (!isElectron()) return;
+    const api = getElectronAPI();
+    const paths = await api.getRecentProjects();
+    const entries = await Promise.all(
+      paths.map(async (path) => {
+        try {
+          const { text, updatedAt } = await api.readProjectManifest(path);
+          const parsed = JSON.parse(text);
+          const title = parsed?.slideset?.title ?? parsed?.slideset?.filename ?? "Untitled Presentation";
+          return { path, title, updatedAt };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    setProjects(entries.filter(Boolean));
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  return { projects, refresh };
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
   const [presentations, setPresentations] = useState([]);
+  const { projects: recentProjects, refresh: refreshRecentProjects } = useRecentProjects();
 
   useEffect(() => {
+    if (isElectron()) return;
     getIndex().then(setPresentations);
   }, []);
 
@@ -32,11 +64,30 @@ export default function HomePage() {
     navigate(`/editor/${id}`);
   };
 
+  const handleOpenProject = async (projectPath) => {
+    const api = getElectronAPI();
+    try {
+      const jsonText = await api.openRecentProject(projectPath);
+      const id = await importPresentationFromJson(jsonText);
+      await api.linkPresentation(id, projectPath);
+      navigate(`/editor/${id}`);
+    } catch (e) {
+      console.error("[HomePage] Failed to open recent project:", e);
+      api.showError("Open Failed", e?.message ?? "Could not open this presentation.");
+    }
+  };
+
   const handleDelete = async (e, id) => {
     e.stopPropagation();
     if (!confirm("Delete this presentation?")) return;
     await deletePresentation(id);
     setPresentations((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleRemoveRecentProject = async (e, projectPath) => {
+    e.stopPropagation();
+    await getElectronAPI().removeRecentProject(projectPath);
+    refreshRecentProjects();
   };
 
   return (
@@ -72,7 +123,40 @@ export default function HomePage() {
         {/* Recent section */}
         <section className="home-section">
           <h2>Recent</h2>
-          {presentations.length === 0 ? (
+          {isElectron() ? (
+            recentProjects.length === 0 ? (
+              <p className="home-empty">
+                No presentations yet. Create one above!
+              </p>
+            ) : (
+              <ul className="home-recent-list">
+                {recentProjects.map((p) => (
+                  <li
+                    key={p.path}
+                    className="home-recent-item"
+                    onClick={() => handleOpenProject(p.path)}
+                  >
+                    <div className="home-recent-thumb">
+                      <span>📄</span>
+                    </div>
+                    <div className="home-recent-info">
+                      <span className="home-recent-title">{p.title}</span>
+                      <span className="home-recent-date">
+                        {formatDate(p.updatedAt)}
+                      </span>
+                    </div>
+                    <button
+                      className="home-recent-delete"
+                      onClick={(e) => handleRemoveRecentProject(e, p.path)}
+                      title="Remove from list"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : presentations.length === 0 ? (
             <p className="home-empty">
               No presentations yet. Create one above!
             </p>

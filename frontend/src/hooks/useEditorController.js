@@ -40,7 +40,7 @@ import {
   downloadPresentationAsJson,
   storeMediaFile,
 } from "../core/persistence/persistenceFacade";
-import { serializePresentation } from "../core/persistence/serializationOperations";
+import { buildProjectManifest } from "../core/persistence/projectFolder";
 import {
   htmlToClipboardParagraphs,
   insertClipboardParagraphs,
@@ -1360,32 +1360,56 @@ useEffect(() => {
     [selectedElementId, updateRunLink],
   );
 
-  const handleSaveAs = useCallback(
-    () => downloadPresentationAsJson(presentation),
-    [presentation],
+  const saveProjectToFolder = useCallback(
+    async (forceNewFolder) => {
+      const api = getElectronAPI();
+      const { jsonText, mediaFiles } = await buildProjectManifest(presentation);
+      const mediaFileEntries = await Promise.all(
+        mediaFiles.map(async (file) => ({
+          relativePath: file.relativePath,
+          kind: "binary",
+          bytes: new Uint8Array(await file.blob.arrayBuffer()),
+        })),
+      );
+      const savedFolder = await api.saveProject({
+        presentationId,
+        presentationTitle: getPresentationTitle(presentation),
+        forceNewFolder,
+        files: [
+          { relativePath: "presentation.json", kind: "text", text: jsonText },
+          ...mediaFileEntries,
+        ],
+      });
+      return Boolean(savedFolder);
+    },
+    [presentation, presentationId],
   );
 
-  const hasLinkedFileRef = useRef(false);
   const handleSave = useCallback(async () => {
     const result = await savePresentation();
     if (!result.success || !isElectron()) return;
-
     const api = getElectronAPI();
     try {
-      if (!hasLinkedFileRef.current) {
-        const defaultName = `${getPresentationTitle(presentation)}.json`;
-        const filePath = await api.saveFile(defaultName, "json", { linkAsSaveTarget: true });
-        if (!filePath) return;
-        await api.writeFile(filePath, serializePresentation(presentation));
-        hasLinkedFileRef.current = true;
-      } else {
-        await api.writeLinkedFile(serializePresentation(presentation));
-      }
+      await saveProjectToFolder(false);
     } catch (e) {
-      console.error("[EditorPage] Failed to save to linked file:", e);
-      api.showError("Save Failed", e?.message ?? "Could not save to the linked file.");
+      console.error("[EditorPage] Failed to save presentation folder:", e);
+      api.showError("Save Failed", e?.message ?? "Could not save the presentation folder.");
     }
-  }, [savePresentation, presentation]);
+  }, [savePresentation, saveProjectToFolder]);
+
+  const handleSaveAs = useCallback(async () => {
+    if (!isElectron()) {
+      downloadPresentationAsJson(presentation);
+      return;
+    }
+    const api = getElectronAPI();
+    try {
+      await saveProjectToFolder(true);
+    } catch (e) {
+      console.error("[EditorPage] Failed to save presentation folder:", e);
+      api.showError("Save Failed", e?.message ?? "Could not save the presentation folder.");
+    }
+  }, [presentation, saveProjectToFolder]);
 
   const handleNew = useCallback(async () => {
     const id = await createPresentation(getPresentationTitle(null));

@@ -2,10 +2,16 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
-  saveFile: (defaultName, extension, options) => ipcRenderer.invoke('dialog:saveFile', defaultName, extension, options),
+  saveFile: (defaultName, extension) => ipcRenderer.invoke('dialog:saveFile', defaultName, extension),
   readFile: (filePath) => ipcRenderer.invoke('file:readFile', filePath),
   writeFile: (filePath, content) => ipcRenderer.invoke('file:writeFile', filePath, content),
-  writeLinkedFile: (content) => ipcRenderer.invoke('file:writeLinkedFile', content),
+
+  saveProject: (payload) => ipcRenderer.invoke('project:save', payload),
+  getRecentProjects: () => ipcRenderer.invoke('project:getRecent'),
+  readProjectManifest: (projectFolder) => ipcRenderer.invoke('project:readManifest', projectFolder),
+  openRecentProject: (projectFolder) => ipcRenderer.invoke('project:openRecent', projectFolder),
+  removeRecentProject: (projectFolder) => ipcRenderer.invoke('project:removeRecent', projectFolder),
+  linkPresentation: (presentationId, projectFolder) => ipcRenderer.invoke('project:linkPresentation', presentationId, projectFolder),
 
   showError: (title, message) => ipcRenderer.invoke('dialog:showError', title, message),
   showMessage: (title, message) => ipcRenderer.invoke('dialog:showMessage', title, message),

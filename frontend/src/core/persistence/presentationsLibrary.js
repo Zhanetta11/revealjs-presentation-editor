@@ -76,9 +76,7 @@ export function deletePresentation(id) {
     let presentation = null;
     try {
       presentation = typeof raw === "string" ? JSON.parse(raw) : raw;
-    } catch {
-      // A corrupt presentation can still be deleted.
-    }
+    } catch {}
     const mediaKeys = new Set();
     const findMediaKeys = (value, target = mediaKeys) => {
       if (Array.isArray(value)) return value.forEach((child) => findMediaKeys(child, target));
@@ -107,7 +105,6 @@ export function deletePresentation(id) {
         findMediaKeys(other, sharedKeys);
         sharedKeys.forEach((sharedKey) => mediaKeys.delete(sharedKey));
       } catch {
-        // Preserve assets if another presentation cannot be inspected safely.
         mediaKeys.clear();
         break;
       }

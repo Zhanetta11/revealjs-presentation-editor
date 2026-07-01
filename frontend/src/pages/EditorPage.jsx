@@ -30,7 +30,7 @@ export default function EditorPage() {
         onClose={() => ctrl.setActiveTab("Home")}
         onGoHome={() => navigate("/")}
         onNew={ctrl.handleNew}
-        onSave={ctrl.savePresentation}
+        onSave={ctrl.handleSave}
         onSaveAs={ctrl.handleSaveAs}
         onExport={ctrl.exportPresentation}
         onExportZip={ctrl.handleExportZip}
@@ -53,7 +53,7 @@ export default function EditorPage() {
           onDuplicateSlide={ctrl.duplicateSlide}
           onMoveSlideUp={ctrl.moveSlideUp}
           onMoveSlideDown={ctrl.moveSlideDown}
-          onSavePresentation={ctrl.savePresentation}
+          onSavePresentation={ctrl.handleSave}
           autosaveEnabled={ctrl.state.autosaveEnabled}
           onToggleAutosave={ctrl.toggleAutosave}
           onExportPresentation={ctrl.exportPresentation}
@@ -353,6 +353,7 @@ export default function EditorPage() {
         <StatusBar
           selectedSlideIndex={ctrl.selectedSlideIndex}
           totalSlides={ctrl.slides.length}
+          saveStatus={ctrl.saveStatus}
           zoom={ctrl.zoom}
           onZoomChange={ctrl.setZoom}
           onZoomIn={ctrl.zoomIn}

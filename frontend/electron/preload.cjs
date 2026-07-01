@@ -2,12 +2,18 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
-  saveFile: (defaultName, extension) => ipcRenderer.invoke('dialog:saveFile', defaultName, extension),
+  saveFile: (defaultName, extension, options) => ipcRenderer.invoke('dialog:saveFile', defaultName, extension, options),
   readFile: (filePath) => ipcRenderer.invoke('file:readFile', filePath),
   writeFile: (filePath, content) => ipcRenderer.invoke('file:writeFile', filePath, content),
+  writeLinkedFile: (content) => ipcRenderer.invoke('file:writeLinkedFile', content),
 
   showError: (title, message) => ipcRenderer.invoke('dialog:showError', title, message),
   showMessage: (title, message) => ipcRenderer.invoke('dialog:showMessage', title, message),
+
+  storageGet: (key) => ipcRenderer.invoke('storage:get', key),
+  storageSet: (key, payload) => ipcRenderer.invoke('storage:set', key, payload),
+  storageRemove: (key) => ipcRenderer.invoke('storage:remove', key),
+  storageListKeys: () => ipcRenderer.invoke('storage:listKeys'),
 
   onMenuNew: (callback) => {
     const listener = () => callback();
@@ -36,14 +42,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('file:dropped', listener);
   },
 
-  getAppPath: () => ipcRenderer.invoke('app:getAppPath'),
-  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  onBeforeQuit: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('app:beforeQuit', listener);
+    return () => ipcRenderer.removeListener('app:beforeQuit', listener);
+  },
+  notifyQuitReady: (success = true, message = '') =>
+    ipcRenderer.send('app:quitReady', { success: Boolean(success), message: String(message) }),
 
-  getConfig: (key) => ipcRenderer.invoke('config:get', key),
-  setConfig: (key, value) => ipcRenderer.invoke('config:set', key, value),
-
-  getLogsDir: () => ipcRenderer.invoke('logs:getDir'),
-
-  getDevMetrics: () => ipcRenderer.invoke('devtools:getMetrics'),
-  getMemoryInfo: () => ipcRenderer.invoke('devtools:getMemory'),
 });

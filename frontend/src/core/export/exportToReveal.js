@@ -21,7 +21,7 @@ import {
   buildAnimationMap,
   styleToString,
 } from "../render/revealRenderer";
-import { resolveParagraphIndentStyles } from "../text/textFormatting";
+import { isSafeLinkHref, resolveParagraphIndentStyles } from "../text/textFormatting";
 import {
   getListMarker,
   getListIndent,
@@ -37,6 +37,10 @@ function buildColorThemeCss(presentation) {
   const colorTheme = presentation?.slideset?.master?.["color-theme"] ?? [];
   if (colorTheme.length === 0) return "";
   const vars = colorTheme
+    .filter((entry) =>
+      /^[a-zA-Z0-9_-]+$/.test(entry?.["css-variable-name"] ?? "")
+      && /^#[0-9a-fA-F]{3,8}$/.test(entry?.color ?? ""),
+    )
     .map((entry) => `  --${entry["css-variable-name"]}: ${entry.color};`)
     .join("\n");
   return `:root {\n${vars}\n}`;
@@ -203,8 +207,11 @@ function applyFragment(innerHtml, wrapperStyle, animation) {
   return `<div class="${classes}" ${dataAttrs} style="${wrapperStyle}">${innerHtml}</div>`;
 }
 
-const validStyleValue = (value) =>
-  value != null && value !== "undefined" ? value : undefined;
+const validStyleValue = (value) => {
+  if (value == null || value === "undefined") return undefined;
+  if (typeof value === "string" && /["'<>;{}]|url\s*\(/i.test(value)) return undefined;
+  return value;
+};
 
 const resolveStyleValue = (own, placeholder, master) =>
   validStyleValue(own)
@@ -275,8 +282,9 @@ function buildRunHtml(run, fallbackFormatting = {}) {
     superSub === "sub" ? "vertical-align: sub; font-size: 0.75em" : "",
   ].filter(Boolean).join("; ");
   const text = escapeHtml(run.text ?? "");
-  if (run.link?.href) {
-    return `<a href="${escapeHtml(run.link.href)}" target="${run.link.target ?? "_blank"}" style="${style}">${text}</a>`;
+  if (isSafeLinkHref(run.link?.href)) {
+    const target = run.link.target === "_self" ? "_self" : "_blank";
+    return `<a href="${escapeHtml(run.link.href)}" target="${target}" rel="noopener noreferrer" style="${style}">${text}</a>`;
   }
   return style ? `<span style="${style}">${text}</span>` : text;
 }

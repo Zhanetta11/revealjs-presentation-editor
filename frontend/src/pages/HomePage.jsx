@@ -7,6 +7,7 @@ import {
 } from "../core/persistence/persistenceFacade";
 import "./HomePage.css";
 import { greeting as getGreeting, formatDate } from "../core/utils/dateUtils";
+import { isElectron, getElectronAPI } from "../core/platform/electron";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -14,6 +15,12 @@ export default function HomePage() {
 
   useEffect(() => {
     getIndex().then(setPresentations);
+  }, []);
+
+  useEffect(() => {
+    if (!isElectron()) return;
+    const api = getElectronAPI();
+    return api.onBeforeQuit(() => api.notifyQuitReady());
   }, []);
 
   const handleNew = async () => {

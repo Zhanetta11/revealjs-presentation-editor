@@ -1,5 +1,3 @@
-const path = require('path');
-
 module.exports = {
   appId: 'com.presentationapp.frontend',
   productName: 'Presentation App',
@@ -37,8 +35,10 @@ module.exports = {
       },
     ],
     icon: 'public/icons/icon.ico',
-    certificateFile: process.env.WIN_CSC_LINK,
-    certificatePassword: process.env.WIN_CSC_KEY_PASSWORD,
+    ...(process.env.WIN_CSC_LINK ? { certificateFile: process.env.WIN_CSC_LINK } : {}),
+    ...(process.env.WIN_CSC_KEY_PASSWORD
+      ? { certificatePassword: process.env.WIN_CSC_KEY_PASSWORD }
+      : {}),
   },
 
   nsis: {
@@ -99,12 +99,6 @@ module.exports = {
     ],
     icon: 'public/icons/icon.png',
     category: 'Office',
-    desktop: {
-      Name: 'Presentation App',
-      Comment: 'Create and edit presentations',
-      Categories: 'Office;Presentation;',
-      Keywords: 'presentation;slides;editor;',
-    },
   },
 
   appImage: {
@@ -128,11 +122,5 @@ module.exports = {
     artifactName: '${productName}-${version}-${arch}.${ext}',
   },
 
-  publish: {
-    provider: 'github',
-    owner: 'your-username',
-    repo: 'presentation-app',
-  },
-
-  buildVersion: process.env.BUILD_VERSION,
+  ...(process.env.BUILD_VERSION ? { buildVersion: process.env.BUILD_VERSION } : {}),
 };

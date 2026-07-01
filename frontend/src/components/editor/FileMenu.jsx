@@ -45,10 +45,15 @@ export default function FileMenu({
   const handleOpen = async () => {
     if (isElectron()) {
       const api = getElectronAPI();
-      const [filePath] = await api.openFile();
-      if (!filePath) return;
-      const content = await api.readFile(filePath);
-      onLoadFile?.(content);
+      try {
+        const [filePath] = await api.openFile();
+        if (!filePath) return;
+        const content = await api.readFile(filePath);
+        onLoadFile?.(content);
+      } catch (e) {
+        console.error("[FileMenu] Failed to read file:", e);
+        api.showError("Open Failed", e?.message ?? "Could not read this file.");
+      }
       return;
     }
     fileInputRef.current?.click();

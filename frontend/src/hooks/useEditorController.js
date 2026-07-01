@@ -40,6 +40,7 @@ import {
   downloadPresentationAsJson,
   storeMediaFile,
 } from "../core/persistence/persistenceFacade";
+import { serializePresentation } from "../core/persistence/serializationOperations";
 import {
   htmlToClipboardParagraphs,
   insertClipboardParagraphs,
@@ -130,13 +131,11 @@ const readClipboardPayload = async () => {
       if (!payload.text && item.types.includes("text/plain"))
         payload.text = await (await item.getType("text/plain")).text();
     }
-  } catch {
-  }
+  } catch {}
   if (!payload.text) {
     try {
       payload.text = (await navigator.clipboard?.readText?.()) ?? "";
-    } catch {
-    }
+    } catch {}
   }
   return payload;
 };
@@ -292,7 +291,7 @@ export function useEditorController() {
     triggerTransitionPreview,
   } = viewState;
 
-  const { state, eventBus, isLoading } = useEditorState(presentationId);
+  const { state, eventBus, isLoading, saveStatus } = useEditorState(presentationId);
   const {
     presentation,
     slides,
@@ -318,7 +317,7 @@ export function useEditorController() {
     moveSlideUp,
     moveSlideDown,
     reorderSlide,
-    savePresentation,
+    savePresentation: dispatchSavePresentation,
     toggleAutosave,
     resetPresentation,
     addTextElement,
@@ -387,6 +386,26 @@ export function useEditorController() {
     addComment,
     deleteComment,
   } = actions;
+
+  const savePresentation = useCallback(
+    async (options = {}) => {
+      try {
+        await dispatchSavePresentation();
+        return { success: true };
+      } catch (error) {
+        const message = error?.message ?? "The presentation could not be saved.";
+        if (options?.silent !== true) {
+          if (isElectron()) {
+            await getElectronAPI().showError("Save Failed", message);
+          } else {
+            window.alert(`Save failed: ${message}`);
+          }
+        }
+        return { success: false, error };
+      }
+    },
+    [dispatchSavePresentation],
+  );
 
   const handleFindNavigate = useCallback(
     (slideIndex, elementId) => {
@@ -1346,6 +1365,28 @@ useEffect(() => {
     [presentation],
   );
 
+  const hasLinkedFileRef = useRef(false);
+  const handleSave = useCallback(async () => {
+    const result = await savePresentation();
+    if (!result.success || !isElectron()) return;
+
+    const api = getElectronAPI();
+    try {
+      if (!hasLinkedFileRef.current) {
+        const defaultName = `${getPresentationTitle(presentation)}.json`;
+        const filePath = await api.saveFile(defaultName, "json", { linkAsSaveTarget: true });
+        if (!filePath) return;
+        await api.writeFile(filePath, serializePresentation(presentation));
+        hasLinkedFileRef.current = true;
+      } else {
+        await api.writeLinkedFile(serializePresentation(presentation));
+      }
+    } catch (e) {
+      console.error("[EditorPage] Failed to save to linked file:", e);
+      api.showError("Save Failed", e?.message ?? "Could not save to the linked file.");
+    }
+  }, [savePresentation, presentation]);
+
   const handleNew = useCallback(async () => {
     const id = await createPresentation(getPresentationTitle(null));
     navigate(`/editor/${id}`);
@@ -1358,6 +1399,12 @@ useEffect(() => {
         navigate(`/editor/${id}`);
       } catch (e) {
         console.error("[EditorPage] Failed to import file:", e);
+        const message = e?.message ?? "Could not open this file.";
+        if (isElectron()) {
+          getElectronAPI().showError("Open Failed", message);
+        } else {
+          window.alert(message);
+        }
       }
     },
     [navigate],
@@ -1365,10 +1412,15 @@ useEffect(() => {
 
   const handleElectronOpen = useCallback(async () => {
     const api = getElectronAPI();
-    const [filePath] = await api.openFile();
-    if (!filePath) return;
-    const content = await api.readFile(filePath);
-    await handleLoadFile(content);
+    try {
+      const [filePath] = await api.openFile();
+      if (!filePath) return;
+      const content = await api.readFile(filePath);
+      await handleLoadFile(content);
+    } catch (e) {
+      console.error("[EditorPage] Failed to read file:", e);
+      api.showError("Open Failed", e?.message ?? "Could not read this file.");
+    }
   }, [handleLoadFile]);
 
   useEffect(() => {
@@ -1378,15 +1430,31 @@ useEffect(() => {
     const unsubscribers = [
       api.onMenuNew(handleNew),
       api.onMenuOpen(handleElectronOpen),
-      api.onMenuSave(savePresentation),
+      api.onMenuSave(handleSave),
       api.onMenuSaveAs(handleSaveAs),
       api.onFileDrop(async (filePath) => {
-        const content = await api.readFile(filePath);
-        await handleLoadFile(content);
+        try {
+          const content = await api.readFile(filePath);
+          await handleLoadFile(content);
+        } catch (e) {
+          console.error("[EditorPage] Failed to read dropped file:", e);
+          api.showError("Open Failed", e?.message ?? "Could not read this file.");
+        }
+      }),
+      api.onBeforeQuit(async () => {
+        const result = await savePresentation({ silent: true });
+        if (result.success) {
+          api.notifyQuitReady(true);
+        } else {
+          api.notifyQuitReady(
+            false,
+            result.error?.message ?? "The presentation could not be saved.",
+          );
+        }
       }),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [handleNew, handleElectronOpen, savePresentation, handleSaveAs, handleLoadFile]);
+  }, [handleNew, handleElectronOpen, savePresentation, handleSave, handleSaveAs, handleLoadFile]);
 
   const handleDeleteAndGoHome = useCallback(async () => {
     if (!presentationId) return;
@@ -1950,6 +2018,7 @@ useEffect(() => {
 
   return {
     isLoading,
+    saveStatus,
 
     state,
     presentation,
@@ -2043,6 +2112,7 @@ useEffect(() => {
     handleNewComment,
     handleHyperlink,
     handleRemoveHyperlink,
+    handleSave,
     handleSaveAs,
     handleNew,
     handleLoadFile,

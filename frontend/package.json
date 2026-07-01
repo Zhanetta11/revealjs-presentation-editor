@@ -2,6 +2,8 @@
   "name": "frontend",
   "private": true,
   "version": "0.0.0",
+  "description": "Local-first browser and Electron presentation editor",
+  "author": "Presentation App Team",
   "type": "module",
   "main": "electron/main.cjs",
   "homepage": "./",
@@ -12,11 +14,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "build:electron": "npm run build && electron-builder",
-    "build:electron:all": "npm run build && electron-builder --publish never",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:electron": "npm run build && electron-builder --config electron-builder.config.cjs",
+    "build:electron:all": "npm run build && electron-builder --config electron-builder.config.cjs --publish never",
+    "build:win": "npm run build && electron-builder --config electron-builder.config.cjs --win",
+    "build:mac": "npm run build && electron-builder --config electron-builder.config.cjs --mac",
+    "build:linux": "npm run build && electron-builder --config electron-builder.config.cjs --linux"
   },
   "dependencies": {
     "electron-store": "^11.0.2",

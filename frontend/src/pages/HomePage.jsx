@@ -9,27 +9,41 @@ import { importPresentationFromJson } from "../core/persistence/importPresentati
 import "./HomePage.css";
 import { greeting as getGreeting, formatDate } from "../core/utils/dateUtils";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
+import { supportsFileSystemAccess } from "../core/platform/fileSystemAccess";
+import {
+  getBrowserRecentProjects,
+  getBrowserLinkedPresentationIds,
+  openBrowserRecentProject,
+  linkBrowserRecentProject,
+  removeBrowserRecentProject,
+} from "../core/persistence/browserProjectFolder";
+
+const usesProjectFolders = () => isElectron() || supportsFileSystemAccess();
 
 function useRecentProjects() {
   const [projects, setProjects] = useState([]);
 
   const refresh = async () => {
-    if (!isElectron()) return;
-    const api = getElectronAPI();
-    const paths = await api.getRecentProjects();
-    const entries = await Promise.all(
-      paths.map(async (path) => {
-        try {
-          const { text, updatedAt } = await api.readProjectManifest(path);
-          const parsed = JSON.parse(text);
-          const title = parsed?.slideset?.title ?? parsed?.slideset?.filename ?? "Untitled Presentation";
-          return { path, title, updatedAt };
-        } catch {
-          return null;
-        }
-      }),
-    );
-    setProjects(entries.filter(Boolean));
+    if (isElectron()) {
+      const api = getElectronAPI();
+      const paths = await api.getRecentProjects();
+      const entries = await Promise.all(
+        paths.map(async (path) => {
+          try {
+            const { text, updatedAt } = await api.readProjectManifest(path);
+            const parsed = JSON.parse(text);
+            const title = parsed?.slideset?.title ?? parsed?.slideset?.filename ?? "Untitled Presentation";
+            return { key: path, title, updatedAt };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      setProjects(entries.filter(Boolean));
+    } else if (supportsFileSystemAccess()) {
+      const entries = await getBrowserRecentProjects();
+      setProjects(entries.map((e) => ({ key: e.id, title: e.title, updatedAt: e.updatedAt })));
+    }
   };
 
   useEffect(() => {
@@ -52,11 +66,14 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!isElectron()) return;
-    getElectronAPI().getLinkedPresentationIds().then(setLinkedIds);
+    if (isElectron()) {
+      getElectronAPI().getLinkedPresentationIds().then(setLinkedIds);
+    } else if (supportsFileSystemAccess()) {
+      getBrowserLinkedPresentationIds().then(setLinkedIds);
+    }
   }, []);
 
-  const draftPresentations = isElectron()
+  const draftPresentations = usesProjectFolders()
     ? presentations.filter((p) => !linkedIds.includes(p.id))
     : [];
 
@@ -75,16 +92,23 @@ export default function HomePage() {
     navigate(`/editor/${id}`);
   };
 
-  const handleOpenProject = async (projectPath) => {
-    const api = getElectronAPI();
+  const handleOpenProject = async (key) => {
     try {
-      const jsonText = await api.openRecentProject(projectPath);
+      const jsonText = isElectron()
+        ? await getElectronAPI().openRecentProject(key)
+        : await openBrowserRecentProject(key);
       const id = await importPresentationFromJson(jsonText);
-      await api.linkPresentation(id, projectPath);
+      if (isElectron()) {
+        await getElectronAPI().linkPresentation(id, key);
+      } else {
+        await linkBrowserRecentProject(id, key);
+      }
       navigate(`/editor/${id}`);
     } catch (e) {
       console.error("[HomePage] Failed to open recent project:", e);
-      api.showError("Open Failed", e?.message ?? "Could not open this presentation.");
+      const message = e?.message ?? "Could not open this presentation.";
+      if (isElectron()) getElectronAPI().showError("Open Failed", message);
+      else window.alert(message);
     }
   };
 
@@ -95,9 +119,10 @@ export default function HomePage() {
     setPresentations((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const handleRemoveRecentProject = async (e, projectPath) => {
+  const handleRemoveRecentProject = async (e, key) => {
     e.stopPropagation();
-    await getElectronAPI().removeRecentProject(projectPath);
+    if (isElectron()) await getElectronAPI().removeRecentProject(key);
+    else await removeBrowserRecentProject(key);
     refreshRecentProjects();
   };
 
@@ -131,8 +156,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Unsaved drafts section (Electron only) */}
-        {isElectron() && draftPresentations.length > 0 && (
+        {/* Unsaved drafts section (project-folder platforms only) */}
+        {usesProjectFolders() && draftPresentations.length > 0 && (
           <section className="home-section">
             <h2>Unsaved Drafts</h2>
             <p className="home-empty">
@@ -170,7 +195,7 @@ export default function HomePage() {
         {/* Recent section */}
         <section className="home-section">
           <h2>Recent</h2>
-          {isElectron() ? (
+          {usesProjectFolders() ? (
             recentProjects.length === 0 ? (
               <p className="home-empty">
                 No presentations yet. Create one above!
@@ -179,9 +204,9 @@ export default function HomePage() {
               <ul className="home-recent-list">
                 {recentProjects.map((p) => (
                   <li
-                    key={p.path}
+                    key={p.key}
                     className="home-recent-item"
-                    onClick={() => handleOpenProject(p.path)}
+                    onClick={() => handleOpenProject(p.key)}
                   >
                     <div className="home-recent-thumb">
                       <span>📄</span>
@@ -194,7 +219,7 @@ export default function HomePage() {
                     </div>
                     <button
                       className="home-recent-delete"
-                      onClick={(e) => handleRemoveRecentProject(e, p.path)}
+                      onClick={(e) => handleRemoveRecentProject(e, p.key)}
                       title="Remove from list"
                     >
                       ✕

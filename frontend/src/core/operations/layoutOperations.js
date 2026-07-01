@@ -362,8 +362,7 @@ export const applyLayoutToSlide = (presentation, slideIndex, layoutId) => {
       };
       return { updated };
     }
-    if (!pid) return { kept: el };
-    if (isModified(el)) return { kept: detachFromPlaceholder(el) };
+    if (!pid || isModified(el)) return { kept: el };
     return { remove: true };
   };
 

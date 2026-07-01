@@ -626,6 +626,14 @@ export default function TextElement({
           const hasRealSelection =
             domSel && !domSel.isCollapsed && domSel.rangeCount > 0;
           if (goingToToolbar) {
+            if (isDeletingRef.current || isTypingRef.current) {
+              // Close out the typing/deleting history transaction before a
+              // toolbar action (e.g. alignment) runs, so the toolbar action
+              // becomes its own undo step instead of merging into the typing.
+              isDeletingRef.current = false;
+              isTypingRef.current = false;
+              onCommitHistory?.();
+            }
             if (!hasRealSelection && !goingToTextContextUi) {
               const el = editableRef.current;
               const collapsed = el ? getCollapsedCursorOffset(el) : null;

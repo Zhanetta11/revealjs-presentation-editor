@@ -41,6 +41,8 @@ import {
   storeMediaFile,
 } from "../core/persistence/persistenceFacade";
 import { buildProjectManifest } from "../core/persistence/projectFolder";
+import { supportsFileSystemAccess } from "../core/platform/fileSystemAccess";
+import { saveProjectToBrowserFolder, getBrowserLinkedFolderName } from "../core/persistence/browserProjectFolder";
 import {
   htmlToClipboardParagraphs,
   insertClipboardParagraphs,
@@ -1397,17 +1399,24 @@ useEffect(() => {
     saveStatusRef.current = saveStatus;
   }, [saveStatus]);
 
+  const canUseProjectFolders = isElectron() || supportsFileSystemAccess();
+
   useEffect(() => {
-    if (!isElectron() || !presentationId) return;
-    getElectronAPI()
-      .getLinkedFolder(presentationId)
-      .then(setLinkedFolderPath)
-      .catch(() => setLinkedFolderPath(null));
+    if (!presentationId) return;
+    if (isElectron()) {
+      getElectronAPI()
+        .getLinkedFolder(presentationId)
+        .then(setLinkedFolderPath)
+        .catch(() => setLinkedFolderPath(null));
+    } else if (supportsFileSystemAccess()) {
+      getBrowserLinkedFolderName(presentationId)
+        .then(setLinkedFolderPath)
+        .catch(() => setLinkedFolderPath(null));
+    }
   }, [presentationId]);
 
   const saveProjectToFolder = useCallback(
     async (forceNewFolder) => {
-      const api = getElectronAPI();
       const { jsonText, mediaFiles } = await buildProjectManifest(presentation);
       const mediaFileEntries = await Promise.all(
         mediaFiles.map(async (file) => ({
@@ -1416,15 +1425,16 @@ useEffect(() => {
           bytes: new Uint8Array(await file.blob.arrayBuffer()),
         })),
       );
-      const savedFolder = await api.saveProject({
-        presentationId,
-        presentationTitle: getPresentationTitle(presentation),
-        forceNewFolder,
-        files: [
-          { relativePath: "presentation.json", kind: "text", text: jsonText },
-          ...mediaFileEntries,
-        ],
-      });
+      const files = [
+        { relativePath: "presentation.json", kind: "text", text: jsonText },
+        ...mediaFileEntries,
+      ];
+      const presentationTitle = getPresentationTitle(presentation);
+
+      const savedFolder = isElectron()
+        ? await getElectronAPI().saveProject({ presentationId, presentationTitle, forceNewFolder, files })
+        : await saveProjectToBrowserFolder({ presentationId, presentationTitle, forceNewFolder, files });
+
       if (savedFolder) setLinkedFolderPath(savedFolder);
       return Boolean(savedFolder);
     },
@@ -1433,29 +1443,31 @@ useEffect(() => {
 
   const handleSave = useCallback(async () => {
     const result = await savePresentation();
-    if (!result.success || !isElectron()) return;
-    const api = getElectronAPI();
+    if (!result.success || !canUseProjectFolders) return;
     try {
       await saveProjectToFolder(false);
     } catch (e) {
       console.error("[EditorPage] Failed to save presentation folder:", e);
-      api.showError("Save Failed", e?.message ?? "Could not save the presentation folder.");
+      const message = e?.message ?? "Could not save the presentation folder.";
+      if (isElectron()) getElectronAPI().showError("Save Failed", message);
+      else window.alert(message);
     }
-  }, [savePresentation, saveProjectToFolder]);
+  }, [savePresentation, saveProjectToFolder, canUseProjectFolders]);
 
   const handleSaveAs = useCallback(async () => {
-    if (!isElectron()) {
+    if (!canUseProjectFolders) {
       downloadPresentationAsJson(presentation);
       return;
     }
-    const api = getElectronAPI();
     try {
       await saveProjectToFolder(true);
     } catch (e) {
       console.error("[EditorPage] Failed to save presentation folder:", e);
-      api.showError("Save Failed", e?.message ?? "Could not save the presentation folder.");
+      const message = e?.message ?? "Could not save the presentation folder.";
+      if (isElectron()) getElectronAPI().showError("Save Failed", message);
+      else window.alert(message);
     }
-  }, [presentation, saveProjectToFolder]);
+  }, [presentation, saveProjectToFolder, canUseProjectFolders]);
 
   const handleNew = useCallback(async () => {
     const id = await createPresentation(getPresentationTitle(null));

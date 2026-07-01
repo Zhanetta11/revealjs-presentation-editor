@@ -1,5 +1,6 @@
 import "./StatusBar.css";
 import { isElectron } from "../../core/platform/electron";
+import { supportsFileSystemAccess } from "../../core/platform/fileSystemAccess";
 
 const SAVE_STATUS_LABEL = {
   pending: "Unsaved changes",
@@ -25,8 +26,9 @@ export default function StatusBar({
   commentCount = 0,
 }) {
   const displayZoom = Math.round(Number(zoom) || 0);
+  const usesProjectFolders = isElectron() || supportsFileSystemAccess();
   const saveStatusLabel = saveStatus === "saved"
-    ? (!isElectron() ? "Saved" : linkedFolderPath ? `Saved to "${folderName(linkedFolderPath)}"` : "Saved (draft)")
+    ? (!usesProjectFolders ? "Saved" : linkedFolderPath ? `Saved to "${folderName(linkedFolderPath)}"` : "Saved (draft)")
     : SAVE_STATUS_LABEL[saveStatus];
 
   return (

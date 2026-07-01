@@ -276,6 +276,11 @@ export default function TextElement({
   }, [innerHTML, savedSelectionRef, textElement.paragraphs]);
 
   const handleFormat = (id, updates) => {
+    if (isDeletingRef.current || isTypingRef.current) {
+      isDeletingRef.current = false;
+      isTypingRef.current = false;
+      onCommitHistory?.();
+    }
     const el = editableRef.current;
     const liveOffsets =
       el && document.activeElement === el ? getSelectionOffsets(el) : null;
@@ -501,19 +506,6 @@ export default function TextElement({
           ) {
             setIsToolbarOpen(false);
           }
-          const isDeleteKey = e.key === "Backspace" || e.key === "Delete";
-          if (isDeleteKey) {
-            if (!isDeletingRef.current) {
-              isDeletingRef.current = true;
-              onBeginHistory?.();
-            }
-          } else if (e.key.length === 1 || e.key === "Enter") {
-            if (isDeletingRef.current) {
-              isDeletingRef.current = false;
-              onCommitHistory?.();
-            }
-            isTypingRef.current = true;
-          }
           if (e.key !== "Tab") return;
           const el = editableRef.current;
           if (!el) return;
@@ -596,6 +588,21 @@ export default function TextElement({
           if (el.innerHTML === "<br>" || el.innerHTML === "<br/>") {
             el.innerHTML = "";
           }
+
+          const inputType = event.nativeEvent?.inputType ?? "";
+          const isDeleteInput = inputType.startsWith("delete");
+          if (isDeleteInput) {
+            if (!isDeletingRef.current) {
+              isDeletingRef.current = true;
+              onBeginHistory?.();
+            }
+          } else {
+            if (isDeletingRef.current) {
+              isDeletingRef.current = false;
+              onCommitHistory?.();
+            }
+            isTypingRef.current = true;
+          }
           const grouped = isDeletingRef.current || isTypingRef.current;
           if (onChangeParagraphs) {
             const paragraphs = domToParagraphs(el, textElement.paragraphs);
@@ -627,9 +634,6 @@ export default function TextElement({
             domSel && !domSel.isCollapsed && domSel.rangeCount > 0;
           if (goingToToolbar) {
             if (isDeletingRef.current || isTypingRef.current) {
-              // Close out the typing/deleting history transaction before a
-              // toolbar action (e.g. alignment) runs, so the toolbar action
-              // becomes its own undo step instead of merging into the typing.
               isDeletingRef.current = false;
               isTypingRef.current = false;
               onCommitHistory?.();

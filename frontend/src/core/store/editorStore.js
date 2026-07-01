@@ -80,6 +80,7 @@ export const createInitialEditorState = () => ({
   past: [],
   future: [],
   pendingSnapshot: null,
+  historyTransactionDirty: false,
   clipboard: null,
   formatPainterClipboard: null,
 });
@@ -96,11 +97,21 @@ function createHistorySnapshot(state) {
 }
 
 function withHistory(state, newState) {
+  if (state.pendingSnapshot) {
+    return {
+      ...newState,
+      past: state.past,
+      future: state.future,
+      pendingSnapshot: state.pendingSnapshot,
+      historyTransactionDirty: true,
+    };
+  }
   return {
     ...newState,
     past: [...state.past, createHistorySnapshot(state)].slice(-HISTORY_LIMIT),
     future: [],
     pendingSnapshot: null,
+    historyTransactionDirty: false,
   };
 }
 
@@ -111,13 +122,14 @@ export const editorReducer = (state, event) => {
       return {
         ...state,
         pendingSnapshot: createHistorySnapshot(state),
+        historyTransactionDirty: false,
         lastEvent: event,
         lastUpdated: Date.now(),
       };
 
     case EditorEventType.HISTORY.COMMIT:
       if (!state.pendingSnapshot) return state;
-      if (state.presentation === state.pendingSnapshot.presentation) {
+      if (!state.historyTransactionDirty) {
         return { ...state, pendingSnapshot: null, lastEvent: event, lastUpdated: Date.now() };
       }
       return {
@@ -125,6 +137,7 @@ export const editorReducer = (state, event) => {
         past: [...state.past, state.pendingSnapshot].slice(-HISTORY_LIMIT),
         future: [],
         pendingSnapshot: null,
+        historyTransactionDirty: false,
         lastEvent: event,
         lastUpdated: Date.now(),
       };
@@ -138,6 +151,7 @@ export const editorReducer = (state, event) => {
         selectedElementId: state.pendingSnapshot.selectedElementId,
         selectedElementIds: state.pendingSnapshot.selectedElementIds ?? [],
         pendingSnapshot: null,
+        historyTransactionDirty: false,
         lastEvent: event,
         lastUpdated: Date.now(),
       };
@@ -152,6 +166,7 @@ export const editorReducer = (state, event) => {
           selectedElementIds: state.pendingSnapshot.selectedElementIds ?? [],
           future: [createHistorySnapshot(state), ...state.future],
           pendingSnapshot: null,
+          historyTransactionDirty: false,
           lastEvent: event,
           lastUpdated: Date.now(),
         };
@@ -170,6 +185,7 @@ export const editorReducer = (state, event) => {
         past: state.past.slice(0, -1),
         future: [createHistorySnapshot(state), ...state.future],
         pendingSnapshot: null,
+        historyTransactionDirty: false,
         lastEvent: event,
         lastUpdated: Date.now(),
       };
@@ -191,6 +207,7 @@ export const editorReducer = (state, event) => {
         ),
         future: state.future.slice(1),
         pendingSnapshot: null,
+        historyTransactionDirty: false,
         lastEvent: event,
         lastUpdated: Date.now(),
       };
@@ -334,6 +351,7 @@ export const editorReducer = (state, event) => {
         past: [],
         future: [],
         pendingSnapshot: null,
+        historyTransactionDirty: false,
         lastEvent: event,
         lastUpdated: Date.now(),
       };
@@ -545,7 +563,9 @@ export const editorReducer = (state, event) => {
       );
       const nextBase = { ...state, presentation: nextPresentation, lastEvent: event, lastUpdated: Date.now() };
       if (event.payload.grouped) {
-        if (state.pendingSnapshot) return nextBase;
+        if (state.pendingSnapshot) {
+          return { ...nextBase, historyTransactionDirty: true };
+        }
         return { ...nextBase, pendingSnapshot: createHistorySnapshot(state) };
       }
       return withHistory(state, nextBase);
@@ -589,7 +609,9 @@ export const editorReducer = (state, event) => {
       );
       const nextBase = { ...state, presentation: nextPresentation, lastEvent: event, lastUpdated: Date.now() };
       if (event.payload.grouped) {
-        if (state.pendingSnapshot) return nextBase;
+        if (state.pendingSnapshot) {
+          return { ...nextBase, historyTransactionDirty: true };
+        }
         return { ...nextBase, pendingSnapshot: createHistorySnapshot(state) };
       }
       return withHistory(state, nextBase);
@@ -695,7 +717,7 @@ export const editorReducer = (state, event) => {
         lastEvent: event,
         lastUpdated: Date.now(),
       };
-      return state.pendingSnapshot ? nextState : withHistory(state, nextState);
+      return withHistory(state, nextState);
     }
 
     case EditorEventType.ELEMENT.UPDATE_SILENT:
@@ -758,7 +780,7 @@ export const editorReducer = (state, event) => {
         lastEvent: event,
         lastUpdated: Date.now(),
       };
-      return state.pendingSnapshot ? nextState : withHistory(state, nextState);
+      return withHistory(state, nextState);
     }
 
     case EditorEventType.MEDIA.DELETE:
@@ -776,19 +798,6 @@ export const editorReducer = (state, event) => {
       });
 
     case EditorEventType.MEDIA.UPDATE:
-      if (state.pendingSnapshot) {
-        return {
-          ...state,
-          presentation: updateMedia(
-            state.presentation,
-            state.selectedSlideIndex,
-            event.payload.mediaId,
-            event.payload.updates,
-          ),
-          lastEvent: event,
-          lastUpdated: Date.now(),
-        };
-      }
       return withHistory(state, {
         ...state,
         presentation: updateMedia(
@@ -987,6 +996,7 @@ export const editorReducer = (state, event) => {
           presentation: updatedPresentation,
           lastEvent: event,
           lastUpdated: Date.now(),
+          historyTransactionDirty: true,
         };
       }
       return withHistory(state, {
@@ -1088,6 +1098,7 @@ export const editorReducer = (state, event) => {
           presentation: updatedPresentation,
           lastEvent: event,
           lastUpdated: Date.now(),
+          historyTransactionDirty: true,
         };
       }
       return withHistory(state, {

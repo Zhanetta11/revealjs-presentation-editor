@@ -334,4 +334,20 @@ describe("editorReducer", () => {
       ),
     ).toEqual([1, 2]);
   });
+
+  test("does not create an undo entry for an unchanged transaction", () => {
+    const initial = createInitialEditorState();
+    const begun = editorReducer(initial, {
+      type: EditorEventType.HISTORY.BEGIN,
+      payload: {},
+    });
+    const committed = editorReducer(begun, {
+      type: EditorEventType.HISTORY.COMMIT,
+      payload: {},
+    });
+
+    expect(committed.past).toHaveLength(0);
+    expect(committed.pendingSnapshot).toBeNull();
+    expect(committed.historyTransactionDirty).toBe(false);
+  });
 });

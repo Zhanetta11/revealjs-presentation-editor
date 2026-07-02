@@ -43,7 +43,7 @@ const detachFromPlaceholder = (element) => {
 };
 
 const hasGeometryOverride = (element, placeholder) => {
-  if (!placeholder) return false;
+  if (!placeholder) return true;
   return (
     (element.position?.x ?? 0) !== (placeholder.position?.x ?? 0)
     || (element.position?.y ?? 0) !== (placeholder.position?.y ?? 0)

@@ -266,7 +266,25 @@ export function useEditorController() {
   const navigate = useNavigate();
 
   const [previewStartSlide, setPreviewStartSlide] = useState(0);
-  const [showComments, setShowComments] = useState(false);
+  // Only one docked side panel (Comments, Selection Pane, Format Background,
+  // Alt Text) can be open at a time, matching PowerPoint's single right-hand
+  // task-pane slot - opening one closes whichever else was open, instead of
+  // stacking independent floating overlays on top of each other.
+  const [activeSidePanel, setActiveSidePanel] = useState(null);
+  const makeSidePanelToggle = (name) => (valueOrUpdater) =>
+    setActiveSidePanel((current) => {
+      const isOpen = current === name;
+      const next = typeof valueOrUpdater === "function" ? valueOrUpdater(isOpen) : valueOrUpdater;
+      return next ? name : (isOpen ? null : current);
+    });
+  const showComments = activeSidePanel === "comments";
+  const setShowComments = makeSidePanelToggle("comments");
+  const showSelectionPane = activeSidePanel === "selection";
+  const setShowSelectionPane = makeSidePanelToggle("selection");
+  const showFormatBackground = activeSidePanel === "format-background";
+  const setShowFormatBackground = makeSidePanelToggle("format-background");
+  const showAltText = activeSidePanel === "alt-text";
+  const setShowAltText = makeSidePanelToggle("alt-text");
   const [ctrl_cropSignal, setCtrlCropSignal] = useState(0);
   const [previewMediaEffects, setPreviewMediaEffects] = useState(null);
   const [previewMediaStyleId, setPreviewMediaStyleId] = useState(null);
@@ -283,7 +301,6 @@ export function useEditorController() {
   const [activeSelection, setActiveSelection] = useState(null);
   const [clearSelectionSignal, setClearSelectionSignal] = useState(0);
   const [findReplaceMode, setFindReplaceMode] = useState("find");
-  const [showSelectionPane, setShowSelectionPane] = useState(false);
   const [objectSelectionMode, setObjectSelectionMode] = useState(false);
 
   const viewState = useEditorViewState();
@@ -628,6 +645,12 @@ useEffect(() => {
     const isMedia = selectedElementRaw && !selectedElementRaw.paragraphs;
     if (!isMedia) setActiveTab("Home");
   }, [selectedElementRaw, activeTab, setActiveTab]);
+
+  useEffect(() => {
+    const isImage = selectedElementRaw && !selectedElementRaw.paragraphs && selectedElementRaw["media-type"] !== "video";
+    if (!isImage) setShowAltText(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedElementRaw]);
 
   const selectedElementsRaw = useMemo(
     () =>
@@ -1229,9 +1252,13 @@ useEffect(() => {
       ]);
       const phW = placeholderElement.width ?? naturalSize.width;
       const phH = placeholderElement.height ?? naturalSize.height;
-      const scale = Math.min(phW / naturalSize.width, phH / naturalSize.height);
-      const fitW = Math.round(naturalSize.width * scale);
-      const fitH = Math.round(naturalSize.height * scale);
+      // Corrupt/zero-dimension files must not divide by zero and produce
+      // NaN geometry - fall back to filling the placeholder's own size.
+      const naturalW = naturalSize.width > 0 ? naturalSize.width : phW;
+      const naturalH = naturalSize.height > 0 ? naturalSize.height : phH;
+      const scale = Math.min(phW / naturalW, phH / naturalH);
+      const fitW = Math.round(naturalW * scale);
+      const fitH = Math.round(naturalH * scale);
       const phPos = placeholderElement.position ?? { x: 60, y: 60 };
       const fitX = Math.round(phPos.x + (phW - fitW) / 2);
       const fitY = Math.round(phPos.y + (phH - fitH) / 2);
@@ -1261,9 +1288,13 @@ useEffect(() => {
       ]);
       const phW = placeholderElement.width ?? naturalSize.width;
       const phH = placeholderElement.height ?? naturalSize.height;
-      const scale = Math.min(phW / naturalSize.width, phH / naturalSize.height);
-      const fitW = Math.round(naturalSize.width * scale);
-      const fitH = Math.round(naturalSize.height * scale);
+      // Corrupt/zero-dimension files must not divide by zero and produce
+      // NaN geometry - fall back to filling the placeholder's own size.
+      const naturalW = naturalSize.width > 0 ? naturalSize.width : phW;
+      const naturalH = naturalSize.height > 0 ? naturalSize.height : phH;
+      const scale = Math.min(phW / naturalW, phH / naturalH);
+      const fitW = Math.round(naturalW * scale);
+      const fitH = Math.round(naturalH * scale);
       const phPos = placeholderElement.position ?? { x: 60, y: 60 };
       const fitX = Math.round(phPos.x + (phW - fitW) / 2);
       const fitY = Math.round(phPos.y + (phH - fitH) / 2);
@@ -1292,7 +1323,7 @@ useEffect(() => {
   const handleNewComment = useCallback(() => {
     setShowComments(true);
     setComposeSession((s) => s + 1);
-  }, []);
+  }, [setShowComments]);
 
   const handleHyperlink = useCallback(
     (elementId, hyperlink, selectionSnapshot = null) => {
@@ -2189,6 +2220,10 @@ useEffect(() => {
     findReplace,
     showSelectionPane,
     setShowSelectionPane,
+    showFormatBackground,
+    setShowFormatBackground,
+    showAltText,
+    setShowAltText,
     objectSelectionMode,
 
     handleApplyBackground,

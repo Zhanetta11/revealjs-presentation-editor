@@ -164,7 +164,6 @@ export const editorReducer = (state, event) => {
           selectedSlideIndex: state.pendingSnapshot.selectedSlideIndex,
           selectedElementId: state.pendingSnapshot.selectedElementId,
           selectedElementIds: state.pendingSnapshot.selectedElementIds ?? [],
-          future: [createHistorySnapshot(state), ...state.future],
           pendingSnapshot: null,
           historyTransactionDirty: false,
           lastEvent: event,
@@ -566,7 +565,7 @@ export const editorReducer = (state, event) => {
         if (state.pendingSnapshot) {
           return { ...nextBase, historyTransactionDirty: true };
         }
-        return { ...nextBase, pendingSnapshot: createHistorySnapshot(state) };
+        return { ...nextBase, pendingSnapshot: createHistorySnapshot(state), historyTransactionDirty: true };
       }
       return withHistory(state, nextBase);
     }
@@ -612,7 +611,7 @@ export const editorReducer = (state, event) => {
         if (state.pendingSnapshot) {
           return { ...nextBase, historyTransactionDirty: true };
         }
-        return { ...nextBase, pendingSnapshot: createHistorySnapshot(state) };
+        return { ...nextBase, pendingSnapshot: createHistorySnapshot(state), historyTransactionDirty: true };
       }
       return withHistory(state, nextBase);
     }

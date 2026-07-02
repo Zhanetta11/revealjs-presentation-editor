@@ -333,7 +333,9 @@ describe("layoutOperations", () => {
 
     const extra = slide.contents.text.find((el) => el.id === "text-extra");
     expect(extra.position).toEqual({ x: 5, y: 5 });
-    expect(extra["placeholder-id"]).toBeUndefined();
+    // placeholder-id is intentionally kept (not stripped) so switching back
+    // to a layout with a matching placeholder later restores this element.
+    expect(extra["placeholder-id"]).toBe("old-extra");
 
     const image = slide.contents.media.find(
         (el) => el["placeholder-id"] === "image"
@@ -355,7 +357,9 @@ describe("layoutOperations", () => {
     const title = updated.slideset.slides[0].contents.text[0];
 
     expect(title.paragraphs[0].runs[0].text).toBe("Original title");
-    expect(title["placeholder-id"]).toBeUndefined();
+    // placeholder-id is intentionally kept (not stripped) so switching back
+    // to a layout with a matching placeholder later restores this element.
+    expect(title["placeholder-id"]).toBe("title");
     expect(title["pos-type"]).toBeUndefined();
     expect(updated.slideset.slides[0].contents.media).toEqual([]);
   });

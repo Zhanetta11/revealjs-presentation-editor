@@ -11,6 +11,7 @@ let mainWindow;
 let readyToClose = false;
 let flushInProgress = false;
 const linkedProjectFolders = new Map();
+const projectSaveQueues = new Map();
 const allowedReadPaths = new Set();
 const allowedWritePaths = new Set();
 
@@ -392,42 +393,54 @@ async function chooseNewProjectFolder(presentationTitle) {
   return projectFolder;
 }
 
+// Serializes project:save calls per presentationId, so an autosave-to-folder
+// and a manual Save/Save-As firing at the same time can't interleave writes
+// or race on choosing/linking the folder for the same presentation.
+function queueProjectSave(presentationId, task) {
+  const previous = projectSaveQueues.get(presentationId) ?? Promise.resolve();
+  const next = previous.then(task, task);
+  projectSaveQueues.set(presentationId, next.catch(() => {}));
+  return next;
+}
+
 ipcMain.handle('project:save', async (event, { presentationId, presentationTitle, files, forceNewFolder } = {}) => {
   requireTrustedSender(event);
   if (!presentationId) throw new Error('Missing presentation id.');
-  try {
-    let folder = linkedProjectFolders.get(presentationId);
-    if (forceNewFolder || !folder) {
-      const chosen = await chooseNewProjectFolder(presentationTitle);
-      if (!chosen) return null;
-      folder = chosen;
-      linkedProjectFolders.set(presentationId, folder);
-    }
+  return queueProjectSave(presentationId, async () => {
+    try {
+      let folder = linkedProjectFolders.get(presentationId);
+      if (forceNewFolder || !folder) {
+        const chosen = await chooseNewProjectFolder(presentationTitle);
+        if (!chosen) return null;
+        folder = chosen;
+        linkedProjectFolders.set(presentationId, folder);
+      }
 
-    const root = path.resolve(folder);
-    for (const file of files) {
-      if (typeof file.relativePath !== 'string' || file.relativePath.includes('..') || path.isAbsolute(file.relativePath)) {
-        throw new Error(`Invalid file path: ${file.relativePath}`);
+      const root = path.resolve(folder);
+      for (const file of files) {
+        if (typeof file.relativePath !== 'string' || file.relativePath.includes('..') || path.isAbsolute(file.relativePath)) {
+          throw new Error(`Invalid file path: ${file.relativePath}`);
+        }
+        const resolved = path.resolve(root, file.relativePath);
+        if (!resolved.startsWith(root + path.sep)) {
+          throw new Error(`Invalid file path: ${file.relativePath}`);
+        }
+        await fs.promises.mkdir(path.dirname(resolved), { recursive: true });
+        if (file.kind === 'binary') {
+          await fs.promises.writeFile(resolved, Buffer.from(file.bytes));
+        } else {
+          await fs.promises.writeFile(resolved, file.text, 'utf-8');
+        }
       }
-      const resolved = path.resolve(root, file.relativePath);
-      if (!resolved.startsWith(root + path.sep)) {
-        throw new Error(`Invalid file path: ${file.relativePath}`);
-      }
-      await fs.promises.mkdir(path.dirname(resolved), { recursive: true });
-      if (file.kind === 'binary') {
-        await fs.promises.writeFile(resolved, Buffer.from(file.bytes));
-      } else {
-        await fs.promises.writeFile(resolved, file.text, 'utf-8');
-      }
+      recordRecentProject(folder);
+      markPresentationLinked(presentationId);
+      logger.info('Project files written successfully', { folder, count: files.length });
+      return folder;
+    } catch (err) {
+      logger.error('Failed to save project', { error: err.message });
+      throw new Error(`Failed to save presentation: ${err.message}`);
     }
-    recordRecentProject(folder);
-    markPresentationLinked(presentationId);
-    logger.info('Project files written successfully', { folder, count: files.length });
-    return folder;
-  } catch (err) {
-    logger.error('Failed to save project', { error: err.message });
-    throw new Error(`Failed to save presentation: ${err.message}`);
-  }
+  });
 });
 
 ipcMain.handle('project:getRecent', async (event) => {

@@ -82,6 +82,9 @@ async function resolveMediaLinks(slides, masterElements = {}) {
       const blob = await getMediaFile(key);
       if (blob) {
         resolvedMap.set(fileLink, await blobToDataUrl(blob));
+      } else {
+        console.warn(`[exportToReveal] Media not found for "${fileLink}", exporting with an empty src.`);
+        resolvedMap.set(fileLink, "");
       }
     }
   }
@@ -106,6 +109,9 @@ async function resolveMediaForZip(slides, masterElements = {}) {
         const ext = blob.type.split("/")[1] ?? (kind === "video" ? "mp4" : "jpg");
         const filename = `media/${kind}/${kind}_${counters[kind]++}.${ext}`;
         resolvedMap.set(fileLink, { src: filename, blob });
+      } else {
+        console.warn(`[exportToRevealZip] Media not found for "${fileLink}", exporting with an empty src.`);
+        resolvedMap.set(fileLink, { src: "", blob: null });
       }
     } else {
       resolvedMap.set(fileLink, { src: fileLink, blob: null });

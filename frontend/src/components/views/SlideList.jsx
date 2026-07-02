@@ -11,6 +11,7 @@ export default function SlideList({
   selectedSlideId,
   onSelectSlide,
   onReorderSlide,
+  onDeleteSlide,
   slideWidth,
   slideHeight,
   presentation,
@@ -107,6 +108,15 @@ export default function SlideList({
     setDragOverIndex(null);
   };
 
+  const handleDeleteKey = (e, index) => {
+    if (e.key !== "Delete" && e.key !== "Backspace") return;
+    if ((slides?.length ?? 0) <= 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onSelectSlide(index);
+    onDeleteSlide?.();
+  };
+
   return (
     <aside className="slide-list" ref={listRef} style={{ width: panelWidth }}>
       <div className="slide-list-resizer" onMouseDown={onResizerMouseDown} />
@@ -136,7 +146,9 @@ export default function SlideList({
                 .filter(Boolean)
                 .join(" ")}
               draggable
+              tabIndex={0}
               onClick={() => onSelectSlide(index)}
+              onKeyDown={(e) => handleDeleteKey(e, index)}
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDrop={(e) => handleDrop(e, index)}

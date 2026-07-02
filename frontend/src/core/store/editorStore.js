@@ -606,6 +606,7 @@ export const editorReducer = (state, event) => {
         event.payload.slideIndex,
         event.payload.elementId,
         event.payload.paragraphs,
+        event.payload.userModified ?? true,
       );
       const nextBase = { ...state, presentation: nextPresentation, lastEvent: event, lastUpdated: Date.now() };
       if (event.payload.grouped) {

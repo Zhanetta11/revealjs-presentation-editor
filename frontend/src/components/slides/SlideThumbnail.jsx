@@ -21,6 +21,9 @@ const PLACEHOLDER_PROMPTS = new Set([
   "Start editing your presentation.",
   "Click to edit text",
   "Click to add text",
+  "Click to edit second content",
+  "Click to add picture",
+  "Click to edit caption",
 ]);
 
 const getPlainText = (paragraphs = []) =>

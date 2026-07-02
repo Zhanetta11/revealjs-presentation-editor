@@ -86,21 +86,6 @@ const createDefaultSlideContents = ({
   comments,
 });
 
-const createMediaElement = (placeholder) => ({
-  id: createId("media"),
-  "file-link": "",
-  "media-type": placeholder.type === "video" ? "video" : "image",
-  position: { ...placeholder.position },
-  width: placeholder.width,
-  height: placeholder.height,
-  rotation: 0,
-  "z-index": 1,
-  scale: 1,
-  crop: [],
-  effects: {},
-  playback: {},
-});
-
 export const createDefaultPresentation = () => {
   const titleFormatting = createTextFormatting({
     size: "44px",
@@ -118,12 +103,12 @@ export const createDefaultPresentation = () => {
   });
 
   const defaultLayout = layouts.find(
-    (layout) => layout["layout-id"] === "title-content-media",
+    (layout) => layout["layout-id"] === "title-content",
   );
 
   if (!defaultLayout) {
     throw new Error(
-      "Default layout 'title-content-media' not found in createDefaultLayouts",
+      "Default layout 'title-content' not found in createDefaultLayouts",
     );
   }
 
@@ -133,12 +118,9 @@ export const createDefaultPresentation = () => {
   const bodyPlaceholder = defaultLayout.placeholders.find(
     (p) => p["placeholder-id"] === "body-placeholder",
   );
-  const mediaPlaceholder = defaultLayout.placeholders.find(
-    (p) => p["placeholder-id"] === "media-placeholder",
-  );
 
-  if (!titlePlaceholder || !bodyPlaceholder || !mediaPlaceholder) {
-    throw new Error("Required placeholders missing from default layout 'title-content-media'");
+  if (!titlePlaceholder || !bodyPlaceholder) {
+    throw new Error("Required placeholders missing from default layout 'title-content'");
   }
 
   return {
@@ -183,7 +165,7 @@ export const createDefaultPresentation = () => {
           title: {
             content: "First Slide",
           },
-          "layout-id": "title-content-media",
+          "layout-id": "title-content",
           hidden: false,
           contents: createDefaultSlideContents({
             text: [
@@ -208,7 +190,7 @@ export const createDefaultPresentation = () => {
                 formatting: {},
               }),
             ],
-            media: [createMediaElement(mediaPlaceholder)],
+            media: [],
           }),
         },
       ],

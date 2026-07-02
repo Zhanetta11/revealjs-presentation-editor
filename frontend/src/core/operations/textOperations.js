@@ -6,6 +6,8 @@ export const CONTENT_PLACEHOLDER_PROMPTS = new Set([
   "Start editing your presentation.",
   "Click to edit text",
   "Click to add text",
+  "Click to edit second content",
+  "Click to add picture",
 ]);
 
 export const createEmptyParagraphs = (paragraphs = []) => {
@@ -204,6 +206,7 @@ export const updateTextElementParagraphs = (
   slideIndex,
   elementId,
   paragraphs,
+  userModified = true,
 ) => {
   const slides = [...getSlides(presentation)];
   const slide = slides[slideIndex];
@@ -211,7 +214,7 @@ export const updateTextElementParagraphs = (
 
   const updatedText = (slide.contents?.text ?? []).map((el) => {
     if (el.id !== elementId) return el;
-    return { ...el, paragraphs, userModified: true };
+    return { ...el, paragraphs, userModified };
   });
 
   slides[slideIndex] = {

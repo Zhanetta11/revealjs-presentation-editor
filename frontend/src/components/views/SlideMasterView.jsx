@@ -89,7 +89,10 @@ function ThemesDropdown({ presentation, onApplyTheme }) {
               <ThemeThumbnailMini
                 theme={activeTheme}
                 isActive={true}
-                onClick={(t) => { onApplyTheme(t.colorTheme, t.decorations); setOpen(false); }}
+                onClick={(t) => {
+                  onApplyTheme(t.colorTheme, t.decorations, { designId: t.id, colorSchemeId: t.defaultColorSchemeId });
+                  setOpen(false);
+                }}
               />
             </div>
           )}
@@ -100,7 +103,10 @@ function ThemesDropdown({ presentation, onApplyTheme }) {
                 key={theme.id}
                 theme={theme}
                 isActive={theme.id === activeTheme?.id}
-                onClick={(t) => { onApplyTheme(t.colorTheme, t.decorations); setOpen(false); }}
+                onClick={(t) => {
+                  onApplyTheme(t.colorTheme, t.decorations, { designId: t.id, colorSchemeId: t.defaultColorSchemeId });
+                  setOpen(false);
+                }}
               />
             ))}
           </div>

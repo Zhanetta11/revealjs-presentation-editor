@@ -860,7 +860,14 @@ useEffect(() => {
   const handleApplyBgFillImage = useCallback(
     async (file, currentSettings) => {
       if (!file || !file.type.startsWith("image/")) return;
-      const { key } = await storeMediaFile(file);
+      let key;
+      try {
+        ({ key } = await storeMediaFile(file));
+      } catch (error) {
+        console.error("[Editor] Failed to store background image:", error);
+        window.alert(`Could not set the background image: ${error?.message ?? "unknown error"}`);
+        return;
+      }
       eventBus.dispatch(
         createEditorEvent(EditorEventType.SLIDE.UPDATE_BACKGROUND, {
           background: { type: "image", "file-link": `indexeddb://${key}`, ...(currentSettings ?? {}) },
@@ -1275,10 +1282,17 @@ useEffect(() => {
   const handlePlaceholderImageUpload = useCallback(
     async (placeholderElement, file) => {
       if (!placeholderElement || !file?.type?.startsWith("image/")) return;
-      const [{ mediaId, key }, naturalSize] = await Promise.all([
-        storeMediaFile(file),
-        readImageDimensionsFromFile(file),
-      ]);
+      let mediaId, key, naturalSize;
+      try {
+        [{ mediaId, key }, naturalSize] = await Promise.all([
+          storeMediaFile(file),
+          readImageDimensionsFromFile(file),
+        ]);
+      } catch (error) {
+        console.error("[Editor] Failed to store placeholder image:", error);
+        window.alert(`Could not add the image: ${error?.message ?? "unknown error"}`);
+        return;
+      }
       const phW = placeholderElement.width ?? naturalSize.width;
       const phH = placeholderElement.height ?? naturalSize.height;
       const naturalW = naturalSize.width > 0 ? naturalSize.width : phW;
@@ -1309,10 +1323,17 @@ useEffect(() => {
   const handlePlaceholderVideoUpload = useCallback(
     async (placeholderElement, file) => {
       if (!placeholderElement || !file?.type?.startsWith("video/")) return;
-      const [{ mediaId, key }, naturalSize] = await Promise.all([
-        storeMediaFile(file),
-        readVideoDimensionsFromFile(file),
-      ]);
+      let mediaId, key, naturalSize;
+      try {
+        [{ mediaId, key }, naturalSize] = await Promise.all([
+          storeMediaFile(file),
+          readVideoDimensionsFromFile(file),
+        ]);
+      } catch (error) {
+        console.error("[Editor] Failed to store placeholder video:", error);
+        window.alert(`Could not add the video: ${error?.message ?? "unknown error"}`);
+        return;
+      }
       const phW = placeholderElement.width ?? naturalSize.width;
       const phH = placeholderElement.height ?? naturalSize.height;
       const naturalW = naturalSize.width > 0 ? naturalSize.width : phW;
@@ -2126,8 +2147,8 @@ useEffect(() => {
   );
 
   const handleChangeParagraphs = useCallback(
-    (elementId, paragraphs, grouped = false) =>
-      updateTextElementParagraphs(selectedSlideIndex, elementId, paragraphs, grouped),
+    (elementId, paragraphs, grouped = false, userModified = true) =>
+      updateTextElementParagraphs(selectedSlideIndex, elementId, paragraphs, grouped, userModified),
     [updateTextElementParagraphs, selectedSlideIndex],
   );
 

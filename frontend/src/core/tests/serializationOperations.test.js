@@ -92,7 +92,7 @@ describe("serializationOperations", () => {
   test("serializes bullets metadata using layout inheritance and explicit none", () => {
     const presentation = createDefaultPresentation();
     const layout = presentation.slideset.layouts.find(
-      (item) => item["layout-id"] === "title-content-media",
+      (item) => item["layout-id"] === "title-content",
     );
     const bodyPlaceholder = layout.placeholders.find(
       (placeholder) => placeholder["placeholder-id"] === "body-placeholder",

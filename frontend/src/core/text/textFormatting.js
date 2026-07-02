@@ -16,7 +16,8 @@ export const isSafeLinkHref = (href) => {
   if (typeof href !== "string" || href.length > 2048) return false;
   try {
     const protocol = new URL(href, globalThis.location?.origin ?? "http://localhost").protocol;
-    return protocol === "file:" && isElectron();
+    if (protocol === "file:") return isElectron();
+    return ["http:", "https:", "mailto:", "tel:"].includes(protocol);
   } catch {
     return false;
   }
@@ -256,7 +257,7 @@ export const resolveParagraphIndentStyles = (
     legacyIndentLevel != null &&
     legacyIndentLevel > 0
   ) {
-    paddingLeft = getListIndent(legacyIndentLevel - 1, "indent");
+    paddingLeft = getListIndent(legacyIndentLevel, "indent");
   }
 
   if (
@@ -385,7 +386,7 @@ export const paragraphsToHTML = (paragraphs, masterFormatting = {}, placeholderF
       );
 
       const markerHtml = renderBullets && listType
-        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.35em;box-sizing:border-box;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.5em;box-sizing:border-box;">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, r(formatting["list-numbered-style"], placeholderFormatting["list-numbered-style"], masterFormatting["list-numbered-style"]))
               : getListMarker(index, "bullets", r(formatting["list-marker"], placeholderFormatting["list-marker"], masterFormatting["list-marker"]), null)

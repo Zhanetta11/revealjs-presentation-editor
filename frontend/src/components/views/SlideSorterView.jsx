@@ -8,6 +8,7 @@ function SlideMiniature({
     isSelected,
     isDragging,
     onClick,
+    onDeleteKey,
     onDragStart,
     onDragOver,
     onDrop,
@@ -21,7 +22,9 @@ function SlideMiniature({
         <div
             className={`sorter-slide${isSelected ? " selected" : ""}${slide.hidden ? " hidden" : ""}${isDragging ? " dragging" : ""}`}
             draggable
+            tabIndex={0}
             onClick={() => onClick(index)}
+            onKeyDown={(e) => onDeleteKey(e, index)}
             onDragStart={(e) => onDragStart(e, index)}
             onDragOver={(e) => onDragOver(e, index)}
             onDrop={(e) => onDrop(e, index)}
@@ -44,7 +47,7 @@ function SlideMiniature({
     );
 }
 
-export default function SlideSorterView({ slides, selectedSlideIndex, onSelectSlide, onReorderSlide, presentation }) {
+export default function SlideSorterView({ slides, selectedSlideIndex, onSelectSlide, onReorderSlide, onDeleteSlide, presentation }) {
     const [draggedIndex, setDraggedIndex] = useState(null);
     const [gapIndex, setGapIndex] = useState(null);
 
@@ -82,6 +85,15 @@ export default function SlideSorterView({ slides, selectedSlideIndex, onSelectSl
         setGapIndex(null);
     };
 
+    const handleDeleteKey = (e, index) => {
+        if (e.key !== "Delete" && e.key !== "Backspace") return;
+        if ((slides?.length ?? 0) <= 1) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onSelectSlide(index);
+        onDeleteSlide?.();
+    };
+
     const isDragging = draggedIndex !== null;
 
     const indicator = (key) => (
@@ -101,6 +113,7 @@ export default function SlideSorterView({ slides, selectedSlideIndex, onSelectSl
                         isSelected={index === selectedSlideIndex}
                         isDragging={draggedIndex === index}
                         onClick={onSelectSlide}
+                        onDeleteKey={handleDeleteKey}
                         onDragStart={handleDragStart}
                         onDragOver={handleDragOver}
                         onDrop={handleDrop}

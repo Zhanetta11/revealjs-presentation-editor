@@ -453,7 +453,7 @@ export default function TextElement({
             const el = editableRef.current;
             if (el) el.innerHTML = emptyHTML;
             lastTypedHTMLRef.current = emptyHTML;
-            onChangeParagraphs?.(textElement.id, emptyParagraphs, true);
+            onChangeParagraphs?.(textElement.id, emptyParagraphs, true, false);
           }
           if (isContentPlaceholderPrompt && plainText !== "") {
             const emptyParagraphs = createEmptyParagraphs(textElement.paragraphs);
@@ -465,7 +465,7 @@ export default function TextElement({
             const el = editableRef.current;
             if (el) el.innerHTML = emptyHTML;
             lastTypedHTMLRef.current = emptyHTML;
-            onChangeParagraphs?.(textElement.id, emptyParagraphs, true);
+            onChangeParagraphs?.(textElement.id, emptyParagraphs, true, false);
           }
           clearSavedSelection(false);
         }}
@@ -676,7 +676,7 @@ export default function TextElement({
               );
               if (el) el.innerHTML = promptHTML;
               lastTypedHTMLRef.current = promptHTML;
-              onChangeParagraphs?.(textElement.id, promptParagraphs, true);
+              onChangeParagraphs?.(textElement.id, promptParagraphs, true, false);
             }
             clearSavedSelection();
             setIsToolbarOpen(false);

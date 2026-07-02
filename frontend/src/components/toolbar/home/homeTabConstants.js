@@ -21,9 +21,13 @@ export const NUMBERED_STYLES = [
 ];
 
 export const LAYOUTS = [
+  { id: "title-slide", label: "Title Slide" },
   { id: "title-content", label: "Title and Content" },
-  { id: "title-content-media", label: "Title, Content and Media" },
-  { id: "two-columns", label: "Two Columns" },
+  { id: "section-header", label: "Section Header" },
+  { id: "two-content", label: "Two Content" },
+  { id: "comparison", label: "Comparison" },
   { id: "title-only", label: "Title Only" },
   { id: "blank", label: "Blank" },
+  { id: "content-caption", label: "Content with Caption" },
+  { id: "picture-caption", label: "Picture with Caption" },
 ];

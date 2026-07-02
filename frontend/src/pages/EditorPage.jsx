@@ -220,6 +220,7 @@ export default function EditorPage() {
             selectedSlideIndex={ctrl.selectedSlideIndex}
             onSelectSlide={ctrl.setSelectedSlideId}
             onReorderSlide={ctrl.reorderSlide}
+            onDeleteSlide={ctrl.deleteSlide}
             presentation={ctrl.presentation}
           />
         ) : ctrl.currentView === "notes-page" ? (
@@ -246,6 +247,7 @@ export default function EditorPage() {
                 selectedSlideId={ctrl.selectedSlideIndex}
                 onSelectSlide={ctrl.setSelectedSlideId}
                 onReorderSlide={ctrl.reorderSlide}
+                onDeleteSlide={ctrl.deleteSlide}
                 slideWidth={ctrl.slideWidth}
                 slideHeight={ctrl.slideHeight}
                 presentation={ctrl.presentation}

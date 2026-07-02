@@ -36,7 +36,7 @@ export const LIST_MARKER_WIDTH_EM = 1.8;
 
 export const getListIndent = (level = 0, listType) =>
   listType
-    ? `${(Math.min(level, MAX_LIST_INDENT_LEVEL) + 1) * LIST_INDENT_PX}px`
+    ? `${Math.min(level, MAX_LIST_INDENT_LEVEL) * LIST_INDENT_PX}px`
     : "0px";
 
 export const getListMarker = (

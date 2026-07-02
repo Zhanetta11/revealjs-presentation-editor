@@ -356,7 +356,7 @@ export function buildTextElementContent(
       );
 
       const markerHtml = listType
-        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.35em;box-sizing:border-box;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.5em;box-sizing:border-box;">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, listNumberedStyle)
               : getListMarker(pIdx, "bullets", listMarker, null)
@@ -717,10 +717,6 @@ export async function exportToRevealZip(presentation) {
   zip.file("reveal/reveal.js", revealJsSource);
   zip.file("reveal/reveal.css", revealCssSource);
   zip.file("reveal/theme/white.css", revealThemeCssSource);
-  zip.file(
-    "README.txt",
-    `${title}\n\nOpen index.html in a web browser to view the presentation.\nWorks fully offline - reveal.js is bundled in the "reveal" folder, no internet connection required.\n`
-  );
 
   for (const [, resolved] of resolvedMap) {
     if (resolved.blob && resolved.src.startsWith("media/")) {

@@ -247,7 +247,7 @@ export function buildMediaInnerStyle(media) {
   return {
     width: "100%",
     height: "100%",
-    objectFit: "contain",
+    objectFit: "fill",
     display: "block",
     maxWidth: "none",
     maxHeight: "none",

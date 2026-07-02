@@ -150,9 +150,27 @@ export const updateMedia = (presentation, slideIndex, mediaId, updates) => {
     ...slide,
     contents: {
       ...slide.contents,
-      media: (slide.contents?.media ?? []).map((media) =>
-        media.id === mediaId ? { ...media, ...updates } : media,
-      ),
+      media: (slide.contents?.media ?? []).map((media) => {
+        if (media.id !== mediaId) return media;
+        const next = { ...media, ...updates };
+        const isResize =
+          ("width" in updates && updates.width !== media.width)
+          || ("height" in updates && updates.height !== media.height);
+        if (isResize && "source-width" in media) {
+          const hasCrop = (media.crop ?? []).some((v) => v !== 0);
+          if (hasCrop) {
+            const scaleX = media.width > 0 ? next.width / media.width : 1;
+            const scaleY = media.height > 0 ? next.height / media.height : 1;
+            next["source-width"] = (media["source-width"] ?? media.width) * scaleX;
+            next["source-height"] = (media["source-height"] ?? media.height) * scaleY;
+          } else {
+            next["source-width"] = next.width;
+            next["source-height"] = next.height;
+            next.crop = [];
+          }
+        }
+        return next;
+      }),
     },
   };
 

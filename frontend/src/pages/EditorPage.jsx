@@ -218,13 +218,15 @@ export default function EditorPage() {
             slides={ctrl.slides}
             selectedSlideIndex={ctrl.selectedSlideIndex}
             onSelectSlide={ctrl.setSelectedSlideId}
+            onReorderSlide={ctrl.reorderSlide}
             presentation={ctrl.presentation}
           />
         ) : ctrl.currentView === "notes-page" ? (
           <NotesPageView
-            slide={ctrl.selectedSlide}
+            slides={ctrl.slides}
+            selectedSlideIndex={ctrl.selectedSlideIndex}
             presentation={ctrl.presentation}
-            slideNotes={ctrl.selectedSlide?.contents?.notes ?? ""}
+            onSelectSlide={ctrl.setSelectedSlideId}
             onUpdateSlideNotes={ctrl.updateSlideNotes}
             onBeginHistory={ctrl.beginHistory}
             onCommitHistory={ctrl.commitHistory}

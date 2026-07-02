@@ -1,3 +1,5 @@
+import { toStorageError } from "./storageErrors";
+
 const DB_NAME = "editor-db";
 const DB_VERSION = 1;
 const STORE_NAME = "keyval";
@@ -10,7 +12,7 @@ function openDB() {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
+        if (e.oldVersion < 1) {
           db.createObjectStore(STORE_NAME);
         }
       };
@@ -38,8 +40,8 @@ export const indexedDbAdapter = {
       const tx = db.transaction(STORE_NAME, "readwrite");
       tx.objectStore(STORE_NAME).put(value, key);
       tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e.target.error);
-      tx.onabort = (e) => reject(e.target.error);
+      tx.onerror = (e) => reject(toStorageError(e.target.error ?? tx.error));
+      tx.onabort = () => reject(toStorageError(tx.error));
     });
   },
 

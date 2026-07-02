@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import "./NotesPageView.css";
 import { buildColorThemeStyle } from "../../core/render/revealRenderer";
-import SlideDecorations from "../canvas/SlideDecorations";
+import SlideThumbnail from "../slides/SlideThumbnail";
 
 function NotesPage({
     slide,
@@ -16,15 +16,6 @@ function NotesPage({
     onCommitHistory,
 }) {
     const PREVIEW_W = 600;
-    const scale = PREVIEW_W / width;
-    const previewH = height * scale;
-
-    const bgColor =
-        !slide?.contents?.background || slide.contents.background === "#FFFFFFFF"
-            ? "var(--bg-light, white)"
-            : slide.contents.background;
-
-    const textElements = slide?.contents?.text ?? [];
 
     return (
         <div
@@ -36,51 +27,16 @@ function NotesPage({
             <div className="notes-page-slide-wrap">
                 <div
                     className="notes-page-slide-frame"
-                    style={{ width: PREVIEW_W, height: previewH }}
+                    style={{ width: PREVIEW_W }}
                 >
-                    <div
-                        style={{
-                            position: "relative",
-                            width,
-                            height,
-                            transform: `scale(${scale})`,
-                            transformOrigin: "top left",
-                            background: bgColor,
-                            overflow: "hidden",
-                        }}
-                    >
-                        <SlideDecorations
-                            presentation={presentation}
-                            width={width}
-                            height={height}
-                        />
-                        {textElements.filter((element) => !element.hidden).map((el, i) => {
-                            const text = (el.paragraphs ?? [])
-                                .map((p) => p.runs?.map((r) => r.text).join("") ?? "")
-                                .join("\n");
-                            const fmt = el.paragraphs?.[0]?.formatting ?? {};
-                            return (
-                                <div
-                                    key={el.id ?? i}
-                                    style={{
-                                        position: "absolute",
-                                        left: el.position?.x ?? 0,
-                                        top: el.position?.y ?? 0,
-                                        width: el.width ?? 300,
-                                        height: el.height ?? 80,
-                                        fontSize: fmt.size ?? (i === 0 ? "44px" : "28px"),
-                                        fontWeight: fmt.weight ?? (i === 0 ? "bold" : "normal"),
-                                        color: fmt.color ?? "var(--text-dark, black)",
-                                        fontFamily: fmt.font ?? "inherit",
-                                        overflow: "hidden",
-                                        whiteSpace: "pre-wrap",
-                                    }}
-                                >
-                                    {text}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {/* Same renderer as the sidebar and the slide sorter, so the
+                        notes page shows media, backgrounds and text formatting. */}
+                    <SlideThumbnail
+                        slide={slide}
+                        slideWidth={width}
+                        slideHeight={height}
+                        presentation={presentation}
+                    />
                 </div>
             </div>
 

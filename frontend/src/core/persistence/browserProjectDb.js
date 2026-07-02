@@ -12,8 +12,10 @@ function openDB() {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
-        if (!db.objectStoreNames.contains(LINKED_STORE)) db.createObjectStore(LINKED_STORE);
-        if (!db.objectStoreNames.contains(RECENT_STORE)) db.createObjectStore(RECENT_STORE);
+        if (e.oldVersion < 1) {
+          db.createObjectStore(LINKED_STORE);
+          db.createObjectStore(RECENT_STORE);
+        }
       };
       request.onsuccess = (e) => {
         const db = e.target.result;
@@ -97,9 +99,7 @@ async function findMatchingRecentId(handle) {
   for (const { key, value } of entries) {
     try {
       if (await value.handle.isSameEntry(handle)) return key;
-    } catch {
-      // Stale/invalid handle - ignore.
-    }
+    } catch {}
   }
   return null;
 }

@@ -85,7 +85,7 @@ function ThemeThumbnail({ theme, isActive, onClick }) {
     );
 }
 
-function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColorSchemeId, onColorSchemeChange }) {
+function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColorSchemeId, onColorSchemeChange, colorTheme, onUpdateThemeColor }) {
     const [showSizeMenu, setShowSizeMenu] = useState(false);
     const [showCustomSize, setShowCustomSize] = useState(false);
     const sizeRef = useRef(null);
@@ -134,6 +134,8 @@ function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColo
                     <ColorsDropdown
                         currentSchemeId={currentColorSchemeId}
                         onColorSchemeSelect={onColorSchemeChange}
+                        colorTheme={colorTheme}
+                        onUpdateThemeColor={onUpdateThemeColor}
                     />
                 </div>
 
@@ -235,7 +237,7 @@ function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColo
     );
 }
 
-export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions }) {
+export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions, onUpdateThemeColor }) {
     const currentTheme = useMemo(
         () => presentation?.slideset?.master?.["color-theme"] ?? [],
         [presentation?.slideset?.master],
@@ -299,6 +301,8 @@ export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onU
                 onUpdateDimensions={onUpdateDimensions}
                 currentColorSchemeId={currentColorSchemeId}
                 onColorSchemeChange={handleColorSchemeSelect}
+                colorTheme={currentTheme}
+                onUpdateThemeColor={onUpdateThemeColor}
             />
         </div>
     );

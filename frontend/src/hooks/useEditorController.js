@@ -23,9 +23,9 @@ import { getPresentationTitle } from "../core/utils/presentationUtils";
 import { getSlideTransition } from "../core/model/transitionDefaults";
 import { importPresentationFromJson } from "../core/persistence/importPresentation";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
+import { isQuotaExceededError } from "../core/persistence/storageErrors";
 import { createTextElementDefaults } from "../core/model/masterDefaults";
 import { updateThemeBackground } from "../core/model/designThemes";
-import { updateMasterThemeColor } from "../core/operations/themeOperations";
 import { clampSlideDimension } from "../core/model/slideSizes";
 import { toHex9 } from "../core/utils/colorUtils";
 import { getLayoutDisplayList } from "../core/operations/layoutOperations";
@@ -266,10 +266,6 @@ export function useEditorController() {
   const navigate = useNavigate();
 
   const [previewStartSlide, setPreviewStartSlide] = useState(0);
-  // Only one docked side panel (Comments, Selection Pane, Format Background,
-  // Alt Text) can be open at a time, matching PowerPoint's single right-hand
-  // task-pane slot - opening one closes whichever else was open, instead of
-  // stacking independent floating overlays on top of each other.
   const [activeSidePanel, setActiveSidePanel] = useState(null);
   const makeSidePanelToggle = (name) => (valueOrUpdater) =>
     setActiveSidePanel((current) => {
@@ -325,7 +321,24 @@ export function useEditorController() {
     triggerTransitionPreview,
   } = viewState;
 
-  const { state, eventBus, isLoading, saveStatus } = useEditorState(presentationId);
+  const quotaWarningShownRef = useRef(false);
+  const handleSaveError = useCallback(async (error) => {
+    if (!isQuotaExceededError(error) || quotaWarningShownRef.current) return;
+    quotaWarningShownRef.current = true;
+    if (isElectron()) {
+      await getElectronAPI().showError("Save Failed", error.message);
+    } else {
+      window.alert(`Save failed: ${error.message}`);
+    }
+  }, []);
+
+  const { state, eventBus, isLoading, saveStatus } = useEditorState(presentationId, {
+    onSaveError: handleSaveError,
+  });
+
+  useEffect(() => {
+    if (saveStatus === "saved") quotaWarningShownRef.current = false;
+  }, [saveStatus]);
   const {
     presentation,
     slides,
@@ -649,7 +662,6 @@ useEffect(() => {
   useEffect(() => {
     const isImage = selectedElementRaw && !selectedElementRaw.paragraphs && selectedElementRaw["media-type"] !== "video";
     if (!isImage) setShowAltText(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementRaw]);
 
   const selectedElementsRaw = useMemo(
@@ -825,19 +837,14 @@ useEffect(() => {
 
   const handleUpdateThemeColor = useCallback(
     (colorVariable, hexColor) => {
-      const updatedPresentation = updateMasterThemeColor(
-        presentation,
-        colorVariable,
-        hexColor
-      );
       eventBus.dispatch(
-        createEditorEvent(EditorEventType.MASTER.UPDATE_THEME, {
-          colorTheme: updatedPresentation.slideset.master["color-theme"],
-          decorations: presentation?.slideset?.master?.decorations,
+        createEditorEvent(EditorEventType.MASTER.UPDATE_THEME_COLOR, {
+          colorVariable,
+          hexColor,
         }),
       );
     },
-    [presentation, eventBus],
+    [eventBus],
   );
 
   const handleApplyBackgroundToAll = useCallback(
@@ -1252,8 +1259,6 @@ useEffect(() => {
       ]);
       const phW = placeholderElement.width ?? naturalSize.width;
       const phH = placeholderElement.height ?? naturalSize.height;
-      // Corrupt/zero-dimension files must not divide by zero and produce
-      // NaN geometry - fall back to filling the placeholder's own size.
       const naturalW = naturalSize.width > 0 ? naturalSize.width : phW;
       const naturalH = naturalSize.height > 0 ? naturalSize.height : phH;
       const scale = Math.min(phW / naturalW, phH / naturalH);
@@ -1288,8 +1293,6 @@ useEffect(() => {
       ]);
       const phW = placeholderElement.width ?? naturalSize.width;
       const phH = placeholderElement.height ?? naturalSize.height;
-      // Corrupt/zero-dimension files must not divide by zero and produce
-      // NaN geometry - fall back to filling the placeholder's own size.
       const naturalW = naturalSize.width > 0 ? naturalSize.width : phW;
       const naturalH = naturalSize.height > 0 ? naturalSize.height : phH;
       const scale = Math.min(phW / naturalW, phH / naturalH);

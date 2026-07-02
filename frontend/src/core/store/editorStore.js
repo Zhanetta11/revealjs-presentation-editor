@@ -68,6 +68,7 @@ import {
   updateAnimation,
   deleteAnimation,
 } from "../operations/animationOperations";
+import { updateMasterThemeColor } from "../operations/themeOperations";
 
 export const createInitialEditorState = () => ({
   presentation: createDefaultPresentation(),
@@ -89,7 +90,7 @@ const HISTORY_LIMIT = 50;
 
 function createHistorySnapshot(state) {
   return {
-    presentation: structuredClone(state.presentation),
+    presentation: state.presentation,
     selectedSlideIndex: state.selectedSlideIndex,
     selectedElementId: state.selectedElementId,
     selectedElementIds: [...(state.selectedElementIds ?? [])],
@@ -1038,6 +1039,18 @@ export const editorReducer = (state, event) => {
           event.payload.colorTheme,
           event.payload.decorations,
           event.payload.metadata,
+        ),
+        lastEvent: event,
+        lastUpdated: Date.now(),
+      });
+
+    case EditorEventType.MASTER.UPDATE_THEME_COLOR:
+      return withHistory(state, {
+        ...state,
+        presentation: updateMasterThemeColor(
+          state.presentation,
+          event.payload.colorVariable,
+          event.payload.hexColor,
         ),
         lastEvent: event,
         lastUpdated: Date.now(),

@@ -66,6 +66,7 @@ const AUTO_SAVE_EVENTS = new Set([
   EditorEventType.FONT.DELETE,
 
   EditorEventType.MASTER.UPDATE_THEME,
+  EditorEventType.MASTER.UPDATE_THEME_COLOR,
   EditorEventType.MASTER.UPDATE_DIMENSIONS,
   EditorEventType.MASTER.UPDATE_FORMATTING,
   EditorEventType.MASTER.ADD_ELEMENT,

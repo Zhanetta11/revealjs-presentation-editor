@@ -228,6 +228,32 @@ describe("editorReducer", () => {
     ).not.toBe(true);
   });
 
+  test("MASTER.UPDATE_THEME_COLOR updates a single theme color inside the reducer", () => {
+    const state = createInitialEditorState();
+    const previousTheme = state.presentation.slideset.master["color-theme"];
+    const colorVariable = previousTheme[0]["css-variable-name"];
+
+    const result = editorReducer(state, {
+      type: EditorEventType.MASTER.UPDATE_THEME_COLOR,
+      payload: { colorVariable, hexColor: "#123456" },
+    });
+
+    const updatedEntry = result.presentation.slideset.master["color-theme"].find(
+      (entry) => entry["css-variable-name"] === colorVariable,
+    );
+    expect(updatedEntry.color.startsWith("#123456")).toBe(true);
+    expect(previousTheme[0].color).not.toBe(updatedEntry.color);
+    expect(result.past).toHaveLength(1);
+
+    const undone = editorReducer(result, {
+      type: EditorEventType.HISTORY.UNDO,
+      payload: {},
+    });
+    expect(
+      undone.presentation.slideset.master["color-theme"][0].color,
+    ).toBe(previousTheme[0].color);
+  });
+
   test("MASTER.UPDATE_THEME stores theme metadata without mutating prior state", () => {
     const state = createInitialEditorState();
     const previousMaster = state.presentation.slideset.master;

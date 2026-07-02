@@ -69,11 +69,19 @@ function blobToDataUrl(blob) {
   });
 }
 
+function collectBackgroundImageRefs(slides) {
+  return slides
+    .map((slide) => slide.contents?.background)
+    .filter((bg) => bg && typeof bg === "object" && bg.type === "image" && bg["file-link"])
+    .map((bg) => ({ "file-link": bg["file-link"], "media-type": "image" }));
+}
+
 async function resolveMediaLinks(slides, masterElements = {}) {
   const resolvedMap = new Map();
   const allMedia = [
     ...(masterElements.media ?? []),
     ...slides.flatMap((slide) => getMediaElements(slide)),
+    ...collectBackgroundImageRefs(slides),
   ];
   for (const media of allMedia) {
     const fileLink = media["file-link"];
@@ -97,6 +105,7 @@ async function resolveMediaForZip(slides, masterElements = {}) {
   const allMedia = [
     ...(masterElements.media ?? []),
     ...slides.flatMap((slide) => getMediaElements(slide)),
+    ...collectBackgroundImageRefs(slides),
   ];
   for (const media of allMedia) {
     const fileLink = media["file-link"];
@@ -446,13 +455,43 @@ function buildDecorationsHtml(presentation, width, height) {
   return `<svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:0;" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${shapeSvgs}</svg>`;
 }
 
+function buildBgFillHtml(bg, width, height, getSrc) {
+  const src = getSrc(bg["file-link"] ?? "");
+  if (!src) return "";
+  const scale = bg.fitToCanvas ?? false;
+  const ol = scale ? 0 : (bg.offsetLeft ?? 0) / 100;
+  const or = scale ? 0 : (bg.offsetRight ?? 0) / 100;
+  const ot = scale ? 0 : (bg.offsetTop ?? 0) / 100;
+  const ob = scale ? 0 : (bg.offsetBottom ?? 0) / 100;
+  const imgStyle = [
+    "position:absolute",
+    `left:${ol * width}px`,
+    `top:${ot * height}px`,
+    `width:${(1 - ol - or) * width}px`,
+    `height:${(1 - ot - ob) * height}px`,
+    `object-fit:${scale ? "fill" : "cover"}`,
+    `opacity:${1 - (bg.transparency ?? 0) / 100}`,
+    "max-width:none",
+    "max-height:none",
+    "margin:0",
+  ].join(";");
+  return `<div style="position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;"><img src="${escapeHtml(src)}" alt="" style="${imgStyle}" /></div>`;
+}
+
 function buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml = "") {
   const textElements = getTextElements(slide);
   const mediaElements = getMediaElements(slide);
   const transition = slide.contents?.transition ?? "slide";
   const transitionDuration = slide.contents?.transitionDuration ?? 0.75;
   const transitionSpeed = TRANSITION_SPEED_MAP[transitionDuration] ?? "default";
-  const background = slide.contents?.background ?? "var(--bg-light, white)";
+  const rawBackground = slide.contents?.background ?? null;
+  const isImageBackground = rawBackground && typeof rawBackground === "object" && rawBackground.type === "image";
+  const background = !rawBackground || isImageBackground
+    ? "var(--bg-light, white)"
+    : rawBackground;
+  const backgroundImageHtml = isImageBackground
+    ? buildBgFillHtml(rawBackground, width, height, getSrc)
+    : "";
   const animationMap = buildAnimationMap(slide);
   const adjustedSeqMap = buildAdjustedSequenceMap(
     slide.contents?.animations ?? [],
@@ -527,6 +566,7 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
       style="background: ${background || "white"};"
     >
       <div style="position: relative; width: ${width}px; height: ${height}px; overflow: hidden;">
+        ${backgroundImageHtml}
         <div style="position:absolute;inset:0;z-index:0;pointer-events:none;">
           ${buildDecorationsHtml(presentation, width, height)}
           ${masterElementsHtml}

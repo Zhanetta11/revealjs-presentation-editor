@@ -56,6 +56,9 @@ function BgFillElement({ fileLink, width, height, settings = {} }) {
           height: (1 - ot - ob) * height,
           objectFit: scale ? "fill" : "cover",
           opacity: 1 - (settings.transparency ?? 0) / 100,
+          maxWidth: "none",
+          maxHeight: "none",
+          margin: 0,
         }}
       />
     </div>

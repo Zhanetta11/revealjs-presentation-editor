@@ -42,19 +42,29 @@ function fitToSlide(width, height, slideWidth, slideHeight) {
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
 
+function reportUploadError(kind, error) {
+  console.error(`[MediaUpload] Failed to add ${kind}:`, error);
+  window.alert(`Could not add the ${kind}: ${error?.message ?? "unknown error"}`);
+}
+
 export function useMediaUpload(addMedia, slideWidth = 1280, slideHeight = 720) {
   const handleImageUpload = useCallback(
     async (event) => {
       const file = event.target.files?.[0];
       if (!file || !file.type.startsWith("image/")) return;
 
-      const [{ mediaId, key }, dims] = await Promise.all([
-        storeMediaFile(file),
-        readImageDimensions(file),
-      ]);
-      const scaledDims = fitToSlide(dims.width, dims.height, slideWidth, slideHeight);
-      addMedia(createImageMediaElement(mediaId, key, scaledDims));
-      event.target.value = "";
+      try {
+        const [{ mediaId, key }, dims] = await Promise.all([
+          storeMediaFile(file),
+          readImageDimensions(file),
+        ]);
+        const scaledDims = fitToSlide(dims.width, dims.height, slideWidth, slideHeight);
+        addMedia(createImageMediaElement(mediaId, key, scaledDims));
+      } catch (error) {
+        reportUploadError("image", error);
+      } finally {
+        event.target.value = "";
+      }
     },
     [addMedia, slideWidth, slideHeight],
   );
@@ -64,13 +74,18 @@ export function useMediaUpload(addMedia, slideWidth = 1280, slideHeight = 720) {
       const file = event.target.files?.[0];
       if (!file || !file.type.startsWith("video/")) return;
 
-      const [{ mediaId, key }, dims] = await Promise.all([
-        storeMediaFile(file),
-        readVideoDimensions(file),
-      ]);
-      const scaledDims = fitToSlide(dims.width, dims.height, slideWidth, slideHeight);
-      addMedia(createVideoMediaElement(mediaId, key, scaledDims));
-      event.target.value = "";
+      try {
+        const [{ mediaId, key }, dims] = await Promise.all([
+          storeMediaFile(file),
+          readVideoDimensions(file),
+        ]);
+        const scaledDims = fitToSlide(dims.width, dims.height, slideWidth, slideHeight);
+        addMedia(createVideoMediaElement(mediaId, key, scaledDims));
+      } catch (error) {
+        reportUploadError("video", error);
+      } finally {
+        event.target.value = "";
+      }
     },
     [addMedia, slideWidth, slideHeight],
   );

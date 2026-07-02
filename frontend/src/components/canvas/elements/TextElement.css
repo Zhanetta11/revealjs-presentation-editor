@@ -232,7 +232,8 @@
 
 .list-markers-overlay .list-marker-line {
   text-align: right;
-  padding-right: 4px;
+  padding-right: 0.35em;
+  box-sizing: border-box;
 }
 
 .list-marker-line {
@@ -241,4 +242,10 @@
   left: 0;
   width: 100%;
   white-space: nowrap;
+}
+
+.content-placeholder-buttons button:disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
 }

@@ -105,6 +105,7 @@ export default function ToolbarContent({
   onRenameLayout,
   onDeleteLayout,
   onAddLayoutPlaceholder,
+  onAddContentPlaceholder,
   onRemoveLayoutPlaceholder,
   onAddMasterElement,
   onDeleteMasterElement,
@@ -157,6 +158,7 @@ export default function ToolbarContent({
           onToggleTitle={onToggleTitle}
           onToggleFooters={onToggleFooters}
           onAddTextElement={onAddTextElement}
+          onAddContentPlaceholder={onAddContentPlaceholder}
           onImageUpload={onImageUpload}
           onVideoUpload={onVideoUpload}
         />

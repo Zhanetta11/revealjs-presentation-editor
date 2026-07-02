@@ -1,83 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getIndex,
   createPresentation,
   deletePresentation,
 } from "../core/persistence/persistenceFacade";
-import { importPresentationFromJson } from "../core/persistence/importPresentation";
 import "./HomePage.css";
 import { greeting as getGreeting, formatDate } from "../core/utils/dateUtils";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
-import { supportsFileSystemAccess } from "../core/platform/fileSystemAccess";
 import {
-  getBrowserRecentProjects,
-  getBrowserLinkedPresentationIds,
-  openBrowserRecentProject,
-  linkBrowserRecentProject,
-  removeBrowserRecentProject,
-  readMediaFileFromRecent,
-} from "../core/persistence/browserProjectFolder";
-import { rehydrateProjectManifestJson } from "../core/persistence/projectMediaRehydrate";
-
-const usesProjectFolders = () => isElectron() || supportsFileSystemAccess();
-
-function useRecentProjects() {
-  const [projects, setProjects] = useState([]);
-
-  const refresh = async () => {
-    if (isElectron()) {
-      const api = getElectronAPI();
-      const paths = await api.getRecentProjects();
-      const entries = await Promise.all(
-        paths.map(async (path) => {
-          try {
-            const { text, updatedAt } = await api.readProjectManifest(path);
-            const parsed = JSON.parse(text);
-            const title = parsed?.slideset?.title ?? parsed?.slideset?.filename ?? "Untitled Presentation";
-            return { key: path, title, updatedAt };
-          } catch {
-            return null;
-          }
-        }),
-      );
-      setProjects(entries.filter(Boolean));
-    } else if (supportsFileSystemAccess()) {
-      const entries = await getBrowserRecentProjects();
-      setProjects(entries.map((e) => ({ key: e.id, title: e.title, updatedAt: e.updatedAt })));
-    }
-  };
-
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  return { projects, refresh };
-}
+  usesProjectFolders,
+  useProjectLibrary,
+  openRecentProject,
+  removeRecentProject,
+} from "../hooks/useProjectLibrary";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [presentations, setPresentations] = useState([]);
-  const [linkedIds, setLinkedIds] = useState([]);
-  const { projects: recentProjects, refresh: refreshRecentProjects } = useRecentProjects();
-
-  const refreshPresentations = () => getIndex().then(setPresentations);
-
-  useEffect(() => {
-    refreshPresentations();
-  }, []);
-
-  useEffect(() => {
-    if (isElectron()) {
-      getElectronAPI().getLinkedPresentationIds().then(setLinkedIds);
-    } else if (supportsFileSystemAccess()) {
-      getBrowserLinkedPresentationIds().then(setLinkedIds);
-    }
-  }, []);
-
-  const draftPresentations = usesProjectFolders()
-    ? presentations.filter((p) => !linkedIds.includes(p.id))
-    : [];
+  const { presentations, recentProjects, draftPresentations, refresh } = useProjectLibrary();
 
   useEffect(() => {
     if (!isElectron()) return;
@@ -96,19 +35,7 @@ export default function HomePage() {
 
   const handleOpenProject = async (key) => {
     try {
-      const jsonText = isElectron()
-        ? await getElectronAPI().openRecentProject(key)
-        : await openBrowserRecentProject(key);
-      const readFile = isElectron()
-        ? (relativePath) => getElectronAPI().readProjectMediaFile(key, relativePath)
-        : (relativePath) => readMediaFileFromRecent(key, relativePath);
-      const rehydratedJsonText = await rehydrateProjectManifestJson(jsonText, readFile);
-      const id = await importPresentationFromJson(rehydratedJsonText);
-      if (isElectron()) {
-        await getElectronAPI().linkPresentation(id, key);
-      } else {
-        await linkBrowserRecentProject(id, key);
-      }
+      const id = await openRecentProject(key);
       navigate(`/editor/${id}`);
     } catch (e) {
       console.error("[HomePage] Failed to open recent project:", e);
@@ -122,14 +49,13 @@ export default function HomePage() {
     e.stopPropagation();
     if (!confirm("Delete this presentation?")) return;
     await deletePresentation(id);
-    setPresentations((prev) => prev.filter((p) => p.id !== id));
+    refresh();
   };
 
   const handleRemoveRecentProject = async (e, key) => {
     e.stopPropagation();
-    if (isElectron()) await getElectronAPI().removeRecentProject(key);
-    else await removeBrowserRecentProject(key);
-    refreshRecentProjects();
+    await removeRecentProject(key);
+    refresh();
   };
 
   return (

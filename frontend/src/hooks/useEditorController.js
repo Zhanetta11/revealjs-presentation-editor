@@ -25,6 +25,7 @@ import { importPresentationFromJson } from "../core/persistence/importPresentati
 import { isElectron, getElectronAPI } from "../core/platform/electron";
 import { isQuotaExceededError } from "../core/persistence/storageErrors";
 import { createTextElementDefaults } from "../core/model/masterDefaults";
+import { createLayoutPlaceholder } from "../core/model/defaultLayouts";
 import { updateThemeBackground } from "../core/model/designThemes";
 import { clampSlideDimension } from "../core/model/slideSizes";
 import { toHex9 } from "../core/utils/colorUtils";
@@ -964,6 +965,27 @@ useEffect(() => {
       addMasterElement("text", createTextElementDefaults(10, "Master text"));
     }
   }, [selectedMasterLayoutId, addLayoutElement, addMasterElement]);
+
+  const handleAddContentPlaceholder = useCallback(() => {
+    if (!selectedMasterLayoutId) return;
+    const layout = (presentation?.slideset?.layouts ?? []).find(
+      (l) => l["layout-id"] === selectedMasterLayoutId,
+    );
+    const offset = (layout?.placeholders?.length ?? 0) * 20;
+    addLayoutPlaceholder(
+      selectedMasterLayoutId,
+      createLayoutPlaceholder({
+        placeholderId: `content-placeholder-${crypto.randomUUID().slice(0, 8)}`,
+        x: 120 + offset,
+        y: 220 + offset,
+        width: 560,
+        height: 320,
+        type: "text",
+        role: "body",
+        padding: "12px",
+      }),
+    );
+  }, [selectedMasterLayoutId, presentation?.slideset?.layouts, addLayoutPlaceholder]);
 
   const activeImageUpload = isSlideMasterOpen
     ? handleMasterImageUpload
@@ -2239,6 +2261,7 @@ useEffect(() => {
     activeVideoUpload,
     activeAddTextElement,
     handleAddMasterTextElement,
+    handleAddContentPlaceholder,
     exportPresentation,
     handleExportZip,
     handleCopy,

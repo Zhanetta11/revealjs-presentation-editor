@@ -55,6 +55,7 @@ export default function CanvasContextMenu({
   textSelection = null,
   onExitEditText,
   onFormatText,
+  onNavigateToSlide,
 }) {
   const menuRef = useRef(null);
   const [position, setPosition] = useState({ left: x, top: y });
@@ -93,19 +94,20 @@ export default function CanvasContextMenu({
     };
 
     const closeOnBlur = () => { if (!dialog) onClose?.(); };
+    const closeOnViewportChange = () => { if (!dialog) onClose?.(); };
 
     document.addEventListener("mousedown", close);
     window.addEventListener("blur", closeOnBlur);
     window.addEventListener("keydown", closeOnEscape);
-    window.addEventListener("resize", onClose);
-    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
 
     return () => {
       document.removeEventListener("mousedown", close);
       window.removeEventListener("blur", closeOnBlur);
       window.removeEventListener("keydown", closeOnEscape);
-      window.removeEventListener("resize", onClose);
-      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
     };
   }, [dialog, onClose]);
 
@@ -302,6 +304,8 @@ export default function CanvasContextMenu({
           onNewComment={onNewComment}
           applyFormatting={applyTextFormatting}
           existingLink={existingHyperlink}
+          hyperlinkEnabled={Boolean(onHyperlink)}
+          onNavigateToSlide={onNavigateToSlide}
           onRemoveLink={() => {
             const selectionForElement = textSelection
               ? { ...textSelection, elementId: textSelection.elementId ?? elementId }

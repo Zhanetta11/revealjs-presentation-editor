@@ -35,6 +35,7 @@ import {
   getSlideContentIds,
 } from "../../core/render/slidesetRenderUtils";
 import { paragraphsToHTML } from "../../core/text/textFormatting";
+import { followHyperlink } from "../../core/utils/hyperlinkUtils";
 
 function BgFillElement({ fileLink, width, height, settings = {} }) {
   const src = useMediaSrc(fileLink);
@@ -141,6 +142,16 @@ export default function PreviewModal({ slides, presentation, onClose, initialSli
     if (e.target.closest("video")) return;
     const deck = deckInstanceRef.current;
     if (!deck) return;
+    const href = e.target.closest("[data-link]")?.dataset?.link;
+    if (href) {
+      followHyperlink(href, (slideIndex) => {
+        const target = slides?.[slideIndex];
+        if (!target || target.hidden) return;
+        const visibleIndex = getVisibleSlidesForPreview(slides).indexOf(target);
+        if (visibleIndex >= 0) deck.slide(visibleIndex);
+      });
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     if (clickX > rect.width / 2) {
@@ -148,7 +159,7 @@ export default function PreviewModal({ slides, presentation, onClose, initialSli
     } else {
       deck.prev();
     }
-  }, []);
+  }, [slides]);
 
   const visibleSlides = getVisibleSlidesForPreview(slides);
   const masterFormatting = presentation?.slideset?.master?.formatting ?? {};

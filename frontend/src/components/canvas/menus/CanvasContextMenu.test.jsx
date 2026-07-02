@@ -58,7 +58,7 @@ describe("CanvasContextMenu — text context", () => {
   });
 
   test("shows Hyperlink... when existingHyperlink is null", () => {
-    renderMenu({ contextType: "text", existingHyperlink: null });
+    renderMenu({ contextType: "text", existingHyperlink: null, onHyperlink: vi.fn() });
     expect(screen.getByText("Hyperlink...")).toBeInTheDocument();
   });
 
@@ -66,9 +66,15 @@ describe("CanvasContextMenu — text context", () => {
     renderMenu({
       contextType: "text",
       existingHyperlink: { href: "https://example.com" },
+      onHyperlink: vi.fn(),
     });
     expect(screen.getByText("Edit Link")).toBeInTheDocument();
     expect(screen.getByText("Remove Link")).toBeInTheDocument();
+    expect(screen.queryByText("Hyperlink...")).not.toBeInTheDocument();
+  });
+
+  test("hides hyperlink items when no onHyperlink handler is provided (Slide Master)", () => {
+    renderMenu({ contextType: "text", existingHyperlink: null });
     expect(screen.queryByText("Hyperlink...")).not.toBeInTheDocument();
   });
 
@@ -141,7 +147,7 @@ describe("CanvasContextMenu — dialog switching", () => {
   });
 
   test("switches to HyperlinkDialog when Hyperlink... is clicked", () => {
-    renderMenu({ contextType: "text", existingHyperlink: null });
+    renderMenu({ contextType: "text", existingHyperlink: null, onHyperlink: vi.fn() });
     fireEvent.click(screen.getByText("Hyperlink..."));
     expect(screen.getByRole("form", { name: "Hyperlink" })).toBeInTheDocument();
   });

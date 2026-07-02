@@ -1,6 +1,6 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, session } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('electron');
 const path = require('path');
-const { pathToFileURL } = require('url');
+const { pathToFileURL, fileURLToPath } = require('url');
 const isDev = require('electron-is-dev');
 const fs = require('fs');
 const logger = require('./logger.cjs');
@@ -96,7 +96,18 @@ function createWindow() {
 
   logger.info('Loading URL', { url: startUrl });
   mainWindow.loadURL(startUrl);
-  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const protocol = new URL(url).protocol;
+      if (protocol === 'http:' || protocol === 'https:' || protocol === 'mailto:') {
+        const { shell } = require('electron');
+        shell.openExternal(url);
+      }
+    } catch {
+      logger.warn('Blocked window.open for invalid URL', { url });
+    }
+    return { action: 'deny' };
+  });
   mainWindow.webContents.on('will-navigate', (event, url) => {
     let allowed = false;
     try {
@@ -298,6 +309,42 @@ ipcMain.handle('dialog:showMessage', async (event, title, message) => {
     title: String(title).slice(0, 100),
     message: String(message).slice(0, 4000),
   });
+});
+
+ipcMain.handle('dialog:pickLinkTarget', async (event) => {
+  requireTrustedSender(event);
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Link to file',
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const filePath = result.filePaths[0];
+  return { path: filePath, url: pathToFileURL(filePath).href, name: path.basename(filePath) };
+});
+
+ipcMain.handle('shell:openLocalFile', async (event, fileUrl) => {
+  requireTrustedSender(event);
+  let filePath;
+  try {
+    filePath = fileURLToPath(String(fileUrl));
+  } catch {
+    throw new Error('Invalid file link.');
+  }
+  const choice = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Open linked file',
+    message: `Open this file with its default application?\n\n${filePath}`,
+    buttons: ['Open', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  if (choice.response !== 0) return false;
+  const errorMessage = await shell.openPath(filePath);
+  if (errorMessage) {
+    await dialog.showErrorBox('Could not open file', errorMessage);
+    return false;
+  }
+  return true;
 });
 
 ipcMain.handle('dialog:confirmSaveBeforeQuit', async (event, folderName) => {

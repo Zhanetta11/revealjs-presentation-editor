@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLinkedFolder: (presentationId) => ipcRenderer.invoke('project:getLinkedFolder', presentationId),
   getLinkedPresentationIds: () => ipcRenderer.invoke('project:getLinkedIds'),
 
+  pickLinkTarget: () => ipcRenderer.invoke('dialog:pickLinkTarget'),
+  openLocalFile: (fileUrl) => ipcRenderer.invoke('shell:openLocalFile', fileUrl),
+
   showError: (title, message) => ipcRenderer.invoke('dialog:showError', title, message),
   showMessage: (title, message) => ipcRenderer.invoke('dialog:showMessage', title, message),
   confirmSaveBeforeQuit: (folderName) => ipcRenderer.invoke('dialog:confirmSaveBeforeQuit', folderName),

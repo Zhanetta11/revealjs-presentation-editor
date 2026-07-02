@@ -111,6 +111,8 @@ export default function EditorCanvas({
   clearSelectionSignal = 0,
   onPromoteLayoutElement,
   onSuppressLayoutPlaceholder,
+  onNavigateToSlide,
+  placeholderActionsDisabled = false,
 }) {
   const workspaceRef = useRef(null);
   const containerRef = useRef(null);
@@ -404,6 +406,8 @@ export default function EditorCanvas({
                       onPlaceholderVideoClick={() =>
                         requestVideoUpload(textElement)
                       }
+                      placeholderActionsDisabled={placeholderActionsDisabled}
+                      onNavigateToSlide={onNavigateToSlide}
                       animationOrder={
                         showAnimationBadges
                           ? animationSequenceMap.get(textElement.id)
@@ -615,6 +619,7 @@ export default function EditorCanvas({
           onRemoveHyperlink={onRemoveHyperlink}
           existingHyperlink={existingHyperlink}
           hyperlinkText={hyperlinkText}
+          onNavigateToSlide={onNavigateToSlide}
           textSelection={contextMenu.textSelection}
           canHyperlink={canHyperlink}
           onExitEditText={exitTextEditing}

@@ -12,6 +12,7 @@ import {
   MdOpenInNew,
 } from "react-icons/md";
 import { ContextMenuItem } from "./ContextMenuItem";
+import { followHyperlink } from "../../../../core/utils/hyperlinkUtils";
 
 const BULLET_STYLES = [
   { value: null, label: "None" },
@@ -91,6 +92,8 @@ export default function TextFormattingMenu({
   applyFormatting,
   existingLink = null,
   onRemoveLink,
+  onNavigateToSlide,
+  hyperlinkEnabled = true,
 }) {
   const indentLevel = formatting["indent-level"] ?? 0;
 
@@ -183,7 +186,7 @@ export default function TextFormattingMenu({
           run={run}
         />
       )}
-      {matches("Hyperlink") && (
+      {hyperlinkEnabled && matches("Hyperlink") && (
         <>
           <div className="canvas-context-menu-separator" />
           {existingLink ? (
@@ -196,7 +199,7 @@ export default function TextFormattingMenu({
               <ContextMenuItem
                 icon={<MdOpenInNew />}
                 label="Open Link"
-                onClick={() => run(() => window.open(existingLink.href, "_blank", "noopener"))}
+                onClick={() => run(() => followHyperlink(existingLink.href, onNavigateToSlide))}
               />
               <ContextMenuItem
                 icon={<MdContentCopy />}
@@ -218,7 +221,7 @@ export default function TextFormattingMenu({
           )}
         </>
       )}
-      {matches("New Comment") && (
+      {Boolean(onNewComment) && matches("New Comment") && (
         <>
           <div className="canvas-context-menu-separator" />
           <ContextMenuItem

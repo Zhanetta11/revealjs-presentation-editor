@@ -377,21 +377,25 @@ export default function FormatToolbar({
         </div>
       </div>
 
-      <div className="ft-separator-v" />
+      {Boolean(onNewComment) && (
+        <>
+          <div className="ft-separator-v" />
 
-      <button
-        type="button"
-        className="ft-new-comment-btn"
-        title="New Comment"
-        onClick={onNewComment}
-      >
-        <MdAddComment className="ft-new-comment-icon" />
-        <span className="ft-new-comment-label">
-          New
-          <br />
-          Comment
-        </span>
-      </button>
+          <button
+            type="button"
+            className="ft-new-comment-btn"
+            title="New Comment"
+            onClick={onNewComment}
+          >
+            <MdAddComment className="ft-new-comment-icon" />
+            <span className="ft-new-comment-label">
+              New
+              <br />
+              Comment
+            </span>
+          </button>
+        </>
+      )}
     </div>
   );
 }

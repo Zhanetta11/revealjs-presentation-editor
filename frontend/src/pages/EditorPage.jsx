@@ -148,6 +148,7 @@ export default function EditorPage() {
           onRenameLayout={ctrl.renameLayout}
           onDeleteLayout={ctrl.deleteLayout}
           onAddLayoutPlaceholder={ctrl.addLayoutPlaceholder}
+          onAddContentPlaceholder={ctrl.handleAddContentPlaceholder}
           onRemoveLayoutPlaceholder={ctrl.removeLayoutPlaceholder}
           onAddMasterElement={ctrl.addMasterElement}
           onDeleteMasterElement={ctrl.deleteMasterElement}
@@ -263,6 +264,7 @@ export default function EditorPage() {
                   onFormatTextElement={ctrl.applyFormatting}
                   currentFormatting={ctrl.currentFormatting}
                   hyperlinkText={ctrl.selectedHyperlinkText}
+                  onNavigateToSlide={ctrl.setSelectedSlideId}
                   onFormatTextRangeElement={ctrl.updateTextRangeFormatting}
                   clearSelectionSignal={ctrl.clearSelectionSignal}
                   onSaveSelection={ctrl.handleSaveSelection}

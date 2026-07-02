@@ -276,7 +276,7 @@ export function buildPStyle(
   ].filter(Boolean).join("; ");
 }
 
-function buildRunHtml(run, fallbackFormatting = {}) {
+function buildRunHtml(run, fallbackFormatting = {}, slideAnchorMap = null) {
   const runFormatting = run.formatting ?? {};
   const superSub = run["super-sub-script"];
   const value = (key) =>
@@ -301,8 +301,17 @@ function buildRunHtml(run, fallbackFormatting = {}) {
   ].filter(Boolean).join("; ");
   const text = escapeHtml(run.text ?? "");
   if (isSafeLinkHref(run.link?.href)) {
-    const target = run.link.target === "_self" ? "_self" : "_blank";
-    return `<a href="${escapeHtml(run.link.href)}" target="${target}" rel="noopener noreferrer" style="${style}">${text}</a>`;
+    const slideMatch = /^#slide-(\d+)$/.exec(run.link.href);
+    let href = run.link.href;
+    if (slideMatch) {
+      const visibleIndex = slideAnchorMap?.get(Number(slideMatch[1]));
+      if (visibleIndex == null) {
+        return style ? `<span style="${style}">${text}</span>` : text;
+      }
+      href = `#/${visibleIndex}`;
+    }
+    const target = slideMatch || run.link.target === "_self" ? "_self" : "_blank";
+    return `<a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer" style="${style}">${text}</a>`;
   }
   return style ? `<span style="${style}">${text}</span>` : text;
 }
@@ -312,6 +321,7 @@ export function buildTextElementContent(
   animation,
   placeholderFormatting = {},
   masterFormatting = {},
+  slideAnchorMap = null,
 ) {
   if (!textElement.paragraphs?.length) return "";
   const sequenceMode = animation?.["effect-options"]?.sequence ?? "as-one-object";
@@ -346,7 +356,7 @@ export function buildTextElementContent(
       );
 
       const markerHtml = listType
-        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:center;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.35em;box-sizing:border-box;">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, listNumberedStyle)
               : getListMarker(pIdx, "bullets", listMarker, null)
@@ -363,7 +373,7 @@ export function buildTextElementContent(
         highlight: resolved("highlight"),
       };
       const runsHtml = (paragraph.runs ?? [])
-        .map((run) => buildRunHtml(run, fallbackFormatting))
+        .map((run) => buildRunHtml(run, fallbackFormatting, slideAnchorMap))
         .join("");
 
       if (!perLine) return `<p style="${pStyle}">${markerHtml}${runsHtml}</p>`;
@@ -478,7 +488,19 @@ function buildBgFillHtml(bg, width, height, getSrc) {
   return `<div style="position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;"><img src="${escapeHtml(src)}" alt="" style="${imgStyle}" /></div>`;
 }
 
-function buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml = "") {
+function buildSlideAnchorMap(presentation) {
+  const map = new Map();
+  let visibleIndex = 0;
+  (presentation?.slideset?.slides ?? []).forEach((slide, index) => {
+    if (!slide.hidden) {
+      map.set(index + 1, visibleIndex);
+      visibleIndex += 1;
+    }
+  });
+  return map;
+}
+
+function buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml = "", slideAnchorMap = null) {
   const textElements = getTextElements(slide);
   const mediaElements = getMediaElements(slide);
   const transition = slide.contents?.transition ?? "slide";
@@ -515,6 +537,7 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
         adjustedAnim,
         placeholderFormatting,
         masterFormatting,
+        slideAnchorMap,
       );
       if (!animation || sequenceMode === "as-one-object") {
         return applyFragment(content, style, adjustedAnim);
@@ -613,7 +636,7 @@ ${scriptTag}
       controls: true,
       progress: true,
       center: false,
-      hash: false,
+      hash: true,
       width: ${width},
       height: ${height},
       margin: 0,
@@ -652,8 +675,9 @@ export async function exportToReveal(presentation) {
   const fontMap = await resolveFontsForHtml(presentation?.slideset?.fonts);
   const fontFaceCss = buildFontFaceCss(fontMap);
 
+  const slideAnchorMap = buildSlideAnchorMap(presentation);
   const slideSections = slides
-    .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml))
+    .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml, slideAnchorMap))
     .join("\n");
 
   const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss);
@@ -677,8 +701,9 @@ export async function exportToRevealZip(presentation) {
   const fontMap = await resolveFontsForZip(presentation?.slideset?.fonts);
   const fontFaceCss = buildFontFaceCss(fontMap);
 
+  const slideAnchorMap = buildSlideAnchorMap(presentation);
   const slideSections = slides
-    .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml))
+    .map((slide) => buildSlideSection(slide, width, height, getSrc, masterFormatting, presentation, masterElementsHtml, slideAnchorMap))
     .join("\n");
 
   const htmlContent = buildHtmlContent(title, colorThemeCss, width, height, slideSections, fontFaceCss, {

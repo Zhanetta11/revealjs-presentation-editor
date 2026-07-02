@@ -98,13 +98,14 @@ export default function InsertTab({ onImageUpload, onVideoUpload, onAddSlide, on
         <button
           className="toolbar-item large"
           onClick={() => setShowHyperlinkDialog(true)}
-          title="Insert Link"
+          title={isSlideMasterOpen ? "Hyperlinks are not available in Slide Master view" : "Insert Link"}
+          disabled={isSlideMasterOpen}
         >
           <MdLink />
           <span>Link</span>
         </button>
 
-        {showHyperlinkDialog && (
+        {showHyperlinkDialog && !isSlideMasterOpen && (
           <HyperlinkDialog
             selectedText={selectedHyperlinkText}
             presentation={presentation}
@@ -124,7 +125,8 @@ export default function InsertTab({ onImageUpload, onVideoUpload, onAddSlide, on
         <button
           className="toolbar-item large"
           onClick={() => onNewComment?.()}
-          title="New Comment"
+          title={isSlideMasterOpen ? "Comments are not available in Slide Master view" : "New Comment"}
+          disabled={isSlideMasterOpen}
         >
           <MdAddComment />
           <span>Comment</span>

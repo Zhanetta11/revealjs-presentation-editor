@@ -61,7 +61,17 @@ describe("TextFormattingMenu — hyperlink section", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => {});
     renderMenu({ existingLink: { href: "https://example.com" } });
     fireEvent.click(screen.getByText("Open Link"));
-    expect(open).toHaveBeenCalledWith("https://example.com", "_blank", "noopener");
+    expect(open).toHaveBeenCalledWith("https://example.com", "_blank", "noopener,noreferrer");
+    open.mockRestore();
+  });
+
+  test("clicking Open Link on a slide link navigates instead of opening a window", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => {});
+    const onNavigateToSlide = vi.fn();
+    renderMenu({ existingLink: { href: "#slide-3" }, onNavigateToSlide });
+    fireEvent.click(screen.getByText("Open Link"));
+    expect(onNavigateToSlide).toHaveBeenCalledWith(2);
+    expect(open).not.toHaveBeenCalled();
     open.mockRestore();
   });
 });

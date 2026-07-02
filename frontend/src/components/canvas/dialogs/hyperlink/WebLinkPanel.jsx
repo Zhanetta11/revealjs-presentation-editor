@@ -6,40 +6,6 @@ import {
 } from "react-icons/md";
 
 const WEB_FOLDERS = ["Current Folder", "Browsed Pages", "Recent Files"];
-const CURRENT_FILES = [
-  "9.641j-spring-2005",
-  "conference-latex-template",
-  "eCommerce-React-main",
-  "Example",
-  "fashion-images",
-  "films-main",
-  "generative_ai_acm",
-];
-const BROWSED_PAGES = [
-  "ms-screenclip:///?source=HotKey",
-  "file:///C:/Users/user/Pictures/Screenshots/photo_2026-03-24_12-29-21.jpg",
-  "file:///C:/Users/user/Pictures/Screenshots/Altynai%20Munduzbaeva.jpg",
-  "file:///C:/Users/user/Pictures/Screenshots/photo_2026-02-21_15-19-57.jpg",
-  "file:///C:/Users/user/Downloads/MM-AI%20-%20Uebung_02.pptx",
-  "file:///C:/Users/user/Desktop/Hof/SWE/final/revealjs-presentation-editor",
-  "file:///C:/Users/user/Documents/cloud/20261_group_07",
-  "file:///C:/Users/user/Desktop/Hof/Cloud",
-  "file:///C:/Users/user/Desktop/Hof/processMining/process/process/Poster.pdf",
-  "file:///C:/Users/user/Documents/Inductive%20Miner.pdf",
-];
-const RECENT_FILES = [
-  "C:\\Users\\user\\Downloads\\MM-AI - Uebung_02.pptx",
-  "https://hochschulehof-my.sharepoint.com/personal/amunduzbaeva_hof-university_de",
-  "C:\\Users\\user\\Downloads\\Telegram Desktop\\Review Paper 09.docx",
-  "C:\\Users\\user\\Downloads\\Lecture 2 (2).pptx",
-  "C:\\Users\\user\\Pictures\\Screenshot 2026-05-10 173944.png",
-  "C:\\Users\\user\\Documents\\new.doc",
-  "https://d.docs.live.net/f68e3bb0184e891d/Document.odt",
-  "C:\\Users\\user\\Downloads\\Telegram Desktop\\A2.1 - Modellprufung neu.docx",
-  "C:\\Users\\user\\Downloads\\A2.1 - Modellprufung neu.pdf",
-  "C:\\Users\\user\\Documents\\Technical Description of Mobile Robot Platform1.docx",
-  "C:\\Users\\user\\Documents\\B Netzwerk neu A2 - Ubungsbuch, Kap. 1.pdf",
-];
 
 function BrowseButton({ title, icon, active, onClick }) {
   return (
@@ -98,12 +64,7 @@ export default function WebLinkPanel({
   onHrefChange,
 }) {
   const isCurrentFolder = webFolder === "Current Folder";
-  const items =
-    webFolder === "Browsed Pages"
-      ? BROWSED_PAGES
-      : webFolder === "Recent Files"
-        ? RECENT_FILES
-        : CURRENT_FILES;
+  const items = [];
 
   return (
     <>
@@ -179,6 +140,11 @@ export default function WebLinkPanel({
               <span>{file}</span>
             </button>
           ))}
+          {items.length === 0 && !selectedFile && (
+            <div className="insert-hyperlink-empty-list">
+              Use Browse... to link to a file, or type an address below.
+            </div>
+          )}
         </div>
         <div className="insert-hyperlink-side-buttons">
           <button

@@ -8,6 +8,8 @@ import EmailLinkPanel from "./hyperlink/EmailLinkPanel";
 import NewDocumentPanel from "./hyperlink/NewDocumentPanel";
 import PlaceLinkPanel from "./hyperlink/PlaceLinkPanel";
 import WebLinkPanel from "./hyperlink/WebLinkPanel";
+import { normalizeHyperlinkHref } from "../../../core/utils/hyperlinkUtils";
+import { isElectron, getElectronAPI } from "../../../core/platform/electron";
 import "./dialogs.css";
 
 const LINK_TYPES = [
@@ -78,6 +80,21 @@ export default function HyperlinkDialog({
     clearError();
   };
 
+  const pickElectronFile = async () => {
+    const picked = await getElectronAPI().pickLinkTarget().catch(() => null);
+    if (!picked) return;
+    setSelectedFile({ name: picked.name, type: "file", href: picked.url });
+    setHref(picked.url);
+    if (!displayText.trim()) setDisplayText(picked.name);
+    if (!screenTip.trim()) setScreenTip(picked.path);
+    clearError();
+  };
+
+  const browseForFile = () => {
+    if (isElectron()) pickElectronFile();
+    else fileInputRef.current?.click();
+  };
+
   const submit = (event) => {
     event.preventDefault();
     const value =
@@ -99,10 +116,11 @@ export default function HyperlinkDialog({
       return;
     }
 
+    const normalized = normalizeHyperlinkHref(value, linkType);
     const finalHref =
       linkType === "email" && emailSubject.trim()
-        ? `${value}?subject=${encodeURIComponent(emailSubject.trim())}`
-        : value;
+        ? `${normalized}?subject=${encodeURIComponent(emailSubject.trim())}`
+        : normalized;
     const ok = onApply?.({
       href: finalHref,
       text: displayText.trim(),
@@ -114,8 +132,6 @@ export default function HyperlinkDialog({
     if (ok === false) {
       setError("Select text in one paragraph before adding a hyperlink.");
     } else if (objectUrlRef.current === finalHref) {
-      // The applied hyperlink now owns this object URL. Revoking it while the
-      // dialog unmounts would immediately make the selected local file invalid.
       objectUrlRef.current = "";
     }
   };
@@ -177,7 +193,7 @@ export default function HyperlinkDialog({
                 selectedFile={selectedFile}
                 webFolder={webFolder}
                 onBrowse={setActiveBrowseButton}
-                onChooseFile={() => fileInputRef.current?.click()}
+                onChooseFile={browseForFile}
                 onFileChange={chooseLocalFile}
                 onFolderChange={(folder) => {
                   setWebFolder(folder);

@@ -310,6 +310,7 @@ export function SlideMasterRibbon({
   masterName, onRenameMaster, selectedMasterLayoutId, onInsertLayout, onRenameLayout,
   onDeleteLayout,
   onAddTextElement, onImageUpload, onVideoUpload,
+  onAddContentPlaceholder,
   onToggleTitle, onToggleFooters,
 }) {
   const imageInputRef = useRef(null);
@@ -364,6 +365,8 @@ export function SlideMasterRibbon({
     setShowPlaceholderMenu(false);
     if (type === "text") {
       onAddTextElement?.();
+    } else if (type === "content") {
+      onAddContentPlaceholder?.();
     } else if (type === "image") {
       imageInputRef.current?.click();
     } else if (type === "video") {
@@ -448,23 +451,30 @@ export function SlideMasterRibbon({
                 }}>
                   {[
                     { type: "text", label: "Text" },
+                    { type: "content", label: "Content", layoutOnly: true },
                     { type: "image", label: "Picture" },
                     { type: "video", label: "Video" },
-                  ].map(({ type, label }) => (
-                    <button
-                      key={type}
-                      onClick={() => handleInsertPlaceholder(type)}
-                      style={{
-                        display: "block", width: "100%", textAlign: "left",
-                        padding: "7px 14px", border: "none", background: "none",
-                        cursor: "pointer", fontSize: 13,
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#f0f4fc"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  ].map(({ type, label, layoutOnly }) => {
+                    const disabled = layoutOnly && !selectedMasterLayoutId;
+                    return (
+                      <button
+                        key={type}
+                        disabled={disabled}
+                        title={disabled ? "Select a layout to insert a content placeholder" : undefined}
+                        onClick={() => handleInsertPlaceholder(type)}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left",
+                          padding: "7px 14px", border: "none", background: "none",
+                          cursor: disabled ? "not-allowed" : "pointer", fontSize: 13,
+                          color: disabled ? "#aaa" : "inherit",
+                        }}
+                        onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = "#f0f4fc"; }}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -706,6 +716,7 @@ export default function SlideMasterView({
           presentation={presentation}
           zoom={canvasZoom}
           showNotes={false}
+          placeholderActionsDisabled
           hideMasterElements={!selectedLayout}
           selectedElementId={selectedMasterElementId}
           selectedElementIds={selectedMasterElementId ? [selectedMasterElementId] : []}
@@ -737,7 +748,7 @@ export default function SlideMasterView({
         <div className="master-canvas-label">
           {selectedMasterLayoutId === null
             ? "Slide Master — changes apply to all slides"
-            : `Layout: ${selectedLayout?.["layout-id"] ?? ""} — changes apply to slides using this layout`}
+            : `Layout: ${selectedLayout?.name ?? selectedLayout?.["layout-id"] ?? ""} — changes apply to slides using this layout`}
         </div>
       </div>
     </div>

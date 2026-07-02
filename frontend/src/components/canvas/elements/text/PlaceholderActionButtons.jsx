@@ -3,18 +3,23 @@ import { MdFileUpload, MdImage, MdVideocam } from "react-icons/md";
 export default function PlaceholderActionButtons({
   onImageClick,
   onVideoClick,
+  disabled = false,
 }) {
-  if (!onImageClick && !onVideoClick) return null;
+  if (!disabled && !onImageClick && !onVideoClick) return null;
+
+  const title = (label) =>
+    disabled ? `${label} (available on slides)` : label;
 
   return (
     <div
       className="content-placeholder-buttons"
       aria-label="Content placeholder actions"
     >
-      {onImageClick && (
+      {(disabled || onImageClick) && (
         <button
           type="button"
-          title="Insert Picture"
+          disabled={disabled}
+          title={title("Insert Picture")}
           aria-label="Insert Picture"
           onMouseDown={(event) => {
             event.preventDefault();
@@ -22,7 +27,7 @@ export default function PlaceholderActionButtons({
           }}
           onClick={(event) => {
             event.stopPropagation();
-            onImageClick();
+            if (!disabled) onImageClick?.();
           }}
         >
           <MdImage />
@@ -31,10 +36,11 @@ export default function PlaceholderActionButtons({
           </span>
         </button>
       )}
-      {onVideoClick && (
+      {(disabled || onVideoClick) && (
         <button
           type="button"
-          title="Insert Video"
+          disabled={disabled}
+          title={title("Insert Video")}
           aria-label="Insert Video"
           onMouseDown={(event) => {
             event.preventDefault();
@@ -42,7 +48,7 @@ export default function PlaceholderActionButtons({
           }}
           onClick={(event) => {
             event.stopPropagation();
-            onVideoClick();
+            if (!disabled) onVideoClick?.();
           }}
         >
           <MdVideocam />

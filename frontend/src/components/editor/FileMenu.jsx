@@ -1,9 +1,13 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRecentPresentations } from "../../hooks/useRecentPresentations";
 import "./FileMenu.css";
 import { greeting, formatDate } from "../../core/utils/dateUtils";
 import { isElectron, getElectronAPI } from "../../core/platform/electron";
+import {
+  usesProjectFolders,
+  useProjectLibrary,
+  openRecentProject,
+} from "../../hooks/useProjectLibrary";
 
 const NAV_ITEMS = [
   { label: "Home",        section: "top" },
@@ -30,8 +34,21 @@ export default function FileMenu({
 }) {
   const navigate = useNavigate();
   const [activeItem, setActiveItem] = useState("Home");
-  const { recent } = useRecentPresentations();
+  const { presentations, recentProjects, draftPresentations } = useProjectLibrary();
   const fileInputRef = useRef(null);
+
+  const handleOpenProject = async (key) => {
+    try {
+      const id = await openRecentProject(key);
+      navigate(`/editor/${id}`);
+      onClose?.();
+    } catch (e) {
+      console.error("[FileMenu] Failed to open recent project:", e);
+      const message = e?.message ?? "Could not open this presentation.";
+      if (isElectron()) getElectronAPI().showError("Open Failed", message);
+      else window.alert(message);
+    }
+  };
 
   const handleNav = (item) => {
     if (item === "Close") { onClose(); return; }
@@ -112,17 +129,58 @@ export default function FileMenu({
               </div>
             </section>
 
-            <section>
-              <h2>Recent</h2>
-              {recent.length === 0 ? (
-                <p className="file-menu-empty">No recent presentations</p>
-              ) : (
+            {usesProjectFolders() && draftPresentations.length > 0 && (
+              <section>
+                <h2>Unsaved Drafts</h2>
                 <ul className="file-menu-recent-list">
-                  {recent.map((p) => (
+                  {draftPresentations.map((p) => (
                     <li
                       key={p.id}
                       className="file-menu-recent-item"
-                      onClick={() => navigate(`/editor/${p.id}`)}
+                      onClick={() => { navigate(`/editor/${p.id}`); onClose?.(); }}
+                    >
+                      <span className="file-menu-recent-icon">📄</span>
+                      <div>
+                        <div className="file-menu-recent-name">{p.title}</div>
+                        <div className="file-menu-recent-meta">
+                          {formatDate(p.updatedAt)}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section>
+              <h2>Recent</h2>
+              {(usesProjectFolders() ? recentProjects : presentations).length === 0 ? (
+                <p className="file-menu-empty">No recent presentations</p>
+              ) : usesProjectFolders() ? (
+                <ul className="file-menu-recent-list">
+                  {recentProjects.map((p) => (
+                    <li
+                      key={p.key}
+                      className="file-menu-recent-item"
+                      onClick={() => handleOpenProject(p.key)}
+                    >
+                      <span className="file-menu-recent-icon">📄</span>
+                      <div>
+                        <div className="file-menu-recent-name">{p.title}</div>
+                        <div className="file-menu-recent-meta">
+                          {formatDate(p.updatedAt)}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <ul className="file-menu-recent-list">
+                  {presentations.map((p) => (
+                    <li
+                      key={p.id}
+                      className="file-menu-recent-item"
+                      onClick={() => { navigate(`/editor/${p.id}`); onClose?.(); }}
                     >
                       <span className="file-menu-recent-icon">📄</span>
                       <div>

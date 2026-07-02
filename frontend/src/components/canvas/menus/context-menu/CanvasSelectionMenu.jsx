@@ -65,11 +65,13 @@ export default function CanvasSelectionMenu({
         onClick={() => run(onRotateRight)}
       />
       <div className="canvas-context-menu-separator" />
-      <ContextMenuItem
-        icon={<MdAddComment />}
-        label="New Comment"
-        onClick={() => run(onNewComment)}
-      />
+      {Boolean(onNewComment) && (
+        <ContextMenuItem
+          icon={<MdAddComment />}
+          label="New Comment"
+          onClick={() => run(onNewComment)}
+        />
+      )}
       <ContextMenuItem
         icon={<MdDeleteOutline />}
         label="Delete"

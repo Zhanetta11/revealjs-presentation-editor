@@ -38,6 +38,7 @@ import {
   createPromptParagraphs,
 } from "../../../core/operations/textOperations";
 import { extractPlainTextFromParagraphs } from "../../../core/text/textFormatting";
+import { followHyperlink } from "../../../core/utils/hyperlinkUtils";
 
 const TEXT_BOX_PLACEHOLDER = "Click to edit text";
 
@@ -74,6 +75,8 @@ export default function TextElement({
   onAutoFit,
   onPlaceholderImageClick,
   onPlaceholderVideoClick,
+  placeholderActionsDisabled = false,
+  onNavigateToSlide,
 }) {
   const editableRef = useRef(null);
   const elementRef = useRef(null);
@@ -233,9 +236,10 @@ export default function TextElement({
     textElement["placeholder-id"]?.includes?.("content");
   const isContentPlaceholderPrompt =
     isContentPlaceholder && CONTENT_PLACEHOLDER_PROMPTS.has(plainText);
-  const shouldShowPlaceholderButtons =
-    isContentPlaceholderPrompt &&
-    (onPlaceholderImageClick || onPlaceholderVideoClick);
+  const shouldShowPlaceholderButtons = placeholderActionsDisabled
+    ? isContentPlaceholder
+    : isContentPlaceholderPrompt &&
+      (onPlaceholderImageClick || onPlaceholderVideoClick);
 
   const innerHTML = paragraphsToHTML(textElement.paragraphs, masterFormatting, placeholderFormatting);
   const { paragraphTops, editableOffsetTop } = useTextLayout({
@@ -471,7 +475,7 @@ export default function TextElement({
           if (e.ctrlKey || e.metaKey) {
             const linkEl = e.target.closest?.("[data-link]");
             const href = linkEl?.dataset?.link;
-            if (href) window.open(href, "_blank", "noopener,noreferrer");
+            if (href) followHyperlink(href, onNavigateToSlide);
           }
         }}
         onTouchEnd={() => {
@@ -763,6 +767,7 @@ export default function TextElement({
         <PlaceholderActionButtons
           onImageClick={onPlaceholderImageClick}
           onVideoClick={onPlaceholderVideoClick}
+          disabled={placeholderActionsDisabled}
         />
       )}
 

@@ -6,7 +6,6 @@ import { DESIGN_THEMES, COLOR_SCHEMES, findActiveTheme, applyColorSchemeToDesign
 import { SLIDE_SIZES, clampSlideDimension } from "../../../core/model/slideSizes";
 import { renderShapes } from "../../../core/render/shapeRenderer";
 import { ColorsDropdown } from "./ColorsDropdown";
-import FormatBackgroundPanel from "../shared/FormatBackgroundPanel";
 
 
 export function ColorPalettePopup({ currentColor, onSelect, onClose }) {
@@ -86,10 +85,9 @@ function ThemeThumbnail({ theme, isActive, onClick }) {
     );
 }
 
-function RightPanel({ presentation, onApplyFont, onUpdateDimensions, onApplySlideBackground, onApplyBgFillImage, onApplyBackgroundToAll, selectedSlide, currentColorSchemeId, onColorSchemeChange }) {
+function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColorSchemeId, onColorSchemeChange }) {
     const [showSizeMenu, setShowSizeMenu] = useState(false);
     const [showCustomSize, setShowCustomSize] = useState(false);
-    const [showFormatBg, setShowFormatBg] = useState(false);
     const sizeRef = useRef(null);
 
     const currentFont = presentation?.slideset?.master?.formatting?.font ?? "Arial";
@@ -233,22 +231,11 @@ function RightPanel({ presentation, onApplyFont, onUpdateDimensions, onApplySlid
             </div>
 
         </div>
-
-        {showFormatBg && (
-            <FormatBackgroundPanel
-                slide={selectedSlide}
-                presentation={presentation}
-                onApplySlideBackground={onApplySlideBackground}
-                onApplyBgFillImage={onApplyBgFillImage}
-                onApplyBackgroundToAll={onApplyBackgroundToAll}
-                onClose={() => setShowFormatBg(false)}
-            />
-        )}
         </>
     );
 }
 
-export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions, onApplySlideBackground, onApplyBgFillImage, onApplyBackgroundToAll, selectedSlide }) {
+export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions }) {
     const currentTheme = useMemo(
         () => presentation?.slideset?.master?.["color-theme"] ?? [],
         [presentation?.slideset?.master],
@@ -310,12 +297,8 @@ export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onU
                 presentation={presentation}
                 onApplyFont={onApplyFont}
                 onUpdateDimensions={onUpdateDimensions}
-                onApplySlideBackground={onApplySlideBackground}
-                onApplyBgFillImage={onApplyBgFillImage}
-                onApplyBackgroundToAll={onApplyBackgroundToAll}
                 currentColorSchemeId={currentColorSchemeId}
                 onColorSchemeChange={handleColorSchemeSelect}
-                selectedSlide={selectedSlide}
             />
         </div>
     );

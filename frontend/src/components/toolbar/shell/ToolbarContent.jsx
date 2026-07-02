@@ -45,9 +45,6 @@ export default function ToolbarContent({
   onAnimationPreview,
   layouts,
   onApplyBackground,
-  onApplySlideBackground,
-  onApplyBgFillImage,
-  onApplyBackgroundToAll,
   onBeginHistory,
   onCommitHistory,
   onAddTextElement,
@@ -79,7 +76,6 @@ export default function ToolbarContent({
   onApplyLayoutFont,
   onUpdateDimensions,
   onUpdateThemeColor,
-  selectedSlide,
   currentView,
   onChangeView,
   showNotes,
@@ -114,6 +110,10 @@ export default function ToolbarContent({
   onDeleteMasterElement,
   onToggleTitle,
   onToggleFooters,
+  showFormatBackground,
+  onToggleFormatBackground,
+  showAltText,
+  onToggleAltText,
 }) {
   return (
     <div
@@ -208,17 +208,15 @@ export default function ToolbarContent({
           onAddSlide={onAddSlide}
           onAddTextElement={onAddTextElement}
           layouts={layouts}
-          selectedSlide={selectedSlide}
           presentation={presentation}
           onApplyBackground={onApplyBackground}
-          onApplySlideBackground={onApplySlideBackground}
-          onApplyBgFillImage={onApplyBgFillImage}
-          onApplyBackgroundToAll={onApplyBackgroundToAll}
           isSlideMasterOpen={isSlideMasterOpen}
           selectedElement={selectedElement}
           selectedHyperlinkText={selectedHyperlinkText}
           onHyperlink={onHyperlink}
           onNewComment={onNewComment}
+          showFormatBackground={showFormatBackground}
+          onToggleFormatBackground={onToggleFormatBackground}
         />
       )}
 
@@ -228,12 +226,7 @@ export default function ToolbarContent({
           onApplyTheme={onApplyTheme}
           onApplyFont={onApplyFont}
           onUpdateDimensions={onUpdateDimensions}
-          onApplyBackground={onApplyBackground}
-          onApplySlideBackground={onApplySlideBackground}
-          onApplyBgFillImage={onApplyBgFillImage}
-          onApplyBackgroundToAll={onApplyBackgroundToAll}
           onUpdateThemeColor={onUpdateThemeColor}
-          selectedSlide={selectedSlide}
         />
       )}
 
@@ -279,6 +272,9 @@ export default function ToolbarContent({
           onPreviewStyle={onPreviewMediaStyle}
           onBeginHistory={onBeginHistory}
           onCommitHistory={onCommitHistory}
+          isSlideMasterOpen={isSlideMasterOpen}
+          showAltText={showAltText}
+          onToggleAltText={onToggleAltText}
         />
       )}
 

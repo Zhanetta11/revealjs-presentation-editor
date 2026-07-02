@@ -393,9 +393,6 @@ async function chooseNewProjectFolder(presentationTitle) {
   return projectFolder;
 }
 
-// Serializes project:save calls per presentationId, so an autosave-to-folder
-// and a manual Save/Save-As firing at the same time can't interleave writes
-// or race on choosing/linking the folder for the same presentation.
 function queueProjectSave(presentationId, task) {
   const previous = projectSaveQueues.get(presentationId) ?? Promise.resolve();
   const next = previous.then(task, task);

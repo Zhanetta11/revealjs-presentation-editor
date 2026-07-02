@@ -13,11 +13,18 @@ import SlideMasterView from "../components/views/SlideMasterView";
 import StatusBar from "../components/editor/StatusBar";
 import FindReplaceDialog from "../components/dialogs/FindReplaceDialog";
 import SelectionPane from "../components/panels/SelectionPane";
+import FormatBackgroundPanel from "../components/toolbar/shared/FormatBackgroundPanel";
+import AltTextPanel from "../components/toolbar/picture-format/AltTextPanel";
 import { useEditorController } from "../hooks/useEditorController";
 
 export default function EditorPage() {
   const navigate = useNavigate();
   const ctrl = useEditorController();
+
+  const updateSelectedMedia = (updates) =>
+    ctrl.selectedMediaElement && (ctrl.isSlideMasterOpen
+      ? ctrl.masterViewAutoFitMedia(ctrl.selectedMediaElement.id, updates)
+      : ctrl.updateMedia(ctrl.selectedMediaElement.id, updates));
 
   if (ctrl.isLoading) {
     return <div className="editor-loading">Loading...</div>;
@@ -147,12 +154,16 @@ export default function EditorPage() {
           onToggleTitle={ctrl.toggleTitle}
           onToggleFooters={ctrl.toggleFooters}
           selectedMediaElement={ctrl.selectedMediaElement}
-          onUpdateSelectedMedia={(updates) =>
-            ctrl.selectedMediaElement && (ctrl.isSlideMasterOpen
-              ? ctrl.masterViewAutoFitMedia(ctrl.selectedMediaElement.id, updates)
-              : ctrl.updateMedia(ctrl.selectedMediaElement.id, updates))
-          }
+          onUpdateSelectedMedia={updateSelectedMedia}
           onCropSelectedMedia={ctrl.triggerCrop}
+          showFormatBackground={ctrl.showFormatBackground}
+          onToggleFormatBackground={() => ctrl.setShowFormatBackground((v) => !v)}
+          showAltText={ctrl.showAltText}
+          onToggleAltText={(value) =>
+            typeof value === "boolean"
+              ? ctrl.setShowAltText(value)
+              : ctrl.setShowAltText((v) => !v)
+          }
           onBringForward={
             ctrl.isSlideMasterOpen
               ? ctrl.handleMasterBringForward
@@ -340,6 +351,25 @@ export default function EditorPage() {
               />
             )}
           </>
+        )}
+
+        {ctrl.showFormatBackground && !ctrl.isSlideMasterOpen && (
+          <FormatBackgroundPanel
+            slide={ctrl.selectedSlide}
+            presentation={ctrl.presentation}
+            onApplySlideBackground={ctrl.handleApplySlideBackground}
+            onApplyBgFillImage={ctrl.handleApplyBgFillImage}
+            onApplyBackgroundToAll={ctrl.handleApplyBackgroundToAll}
+            onClose={() => ctrl.setShowFormatBackground(false)}
+          />
+        )}
+
+        {ctrl.showAltText && !ctrl.isSlideMasterOpen && (
+          <AltTextPanel
+            media={ctrl.selectedMediaElement}
+            onUpdate={updateSelectedMedia}
+            onClose={() => ctrl.setShowAltText(false)}
+          />
         )}
       </div>
 

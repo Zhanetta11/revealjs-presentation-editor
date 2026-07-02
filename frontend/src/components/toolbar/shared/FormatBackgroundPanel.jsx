@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { MdClose } from "react-icons/md";
 import { useMediaSrc } from "../../../hooks/useMediaSrc";
 import "./FormatBackgroundPanel.css";
@@ -191,8 +190,8 @@ export default function FormatBackgroundPanel({
     }
   };
 
-  return createPortal(
-    <div className="fbp-panel" ref={panelRef} style={{ width: width !== 280 ? width : undefined }}>
+  return (
+    <div className="fbp-panel" ref={panelRef} style={{ flexBasis: width }}>
       <div className="fbp-resize-handle" onMouseDown={onResizeMouseDown} />
       <div className="fbp-header">
         <span className="fbp-title">Format Background</span>
@@ -318,7 +317,6 @@ export default function FormatBackgroundPanel({
           Reset Background
         </button>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }

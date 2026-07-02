@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { MdClose, MdInfoOutline } from "react-icons/md";
 import "./AltTextPanel.css";
 
-export default function AltTextPanel({ media, onUpdate, onClose }) {
+export default function AltTextPanel({ media, onUpdate, onClose, overlay = false }) {
   const [draft, setDraft] = useState(() => ({
     mediaId: media?.id,
     altText: media?.alt ?? "",
@@ -16,8 +16,8 @@ export default function AltTextPanel({ media, onUpdate, onClose }) {
     onUpdate({ alt: decorative ? "" : altText, decorative });
   };
 
-  return createPortal(
-    <div className="alt-panel">
+  const content = (
+    <div className={`alt-panel${overlay ? " alt-panel--overlay" : ""}`}>
       <div className="alt-panel-header">
         <span className="alt-panel-title">Alt Text</span>
         <button className="alt-panel-close" onClick={onClose}><MdClose /></button>
@@ -61,7 +61,8 @@ export default function AltTextPanel({ media, onUpdate, onClose }) {
           </span>
         </label>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
+
+  return overlay ? createPortal(content, document.body) : content;
 }

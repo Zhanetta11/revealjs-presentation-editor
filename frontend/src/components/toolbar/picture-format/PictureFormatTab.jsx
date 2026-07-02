@@ -1002,11 +1002,33 @@ function ArtisticPopover({ src, effects, onUpdate, anchorRect }) {
   );
 }
 
-export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForward, onSendBackward, onChangePicture, onPreviewEffects, onPreviewStyle, onBeginHistory, onCommitHistory }) {
+export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForward, onSendBackward, onChangePicture, onPreviewEffects, onPreviewStyle, onBeginHistory, onCommitHistory, isSlideMasterOpen = false, showAltText = false, onToggleAltText }) {
   const resolvedSrc = useMediaSrc(media?.["file-link"]);
   const [openPopover, setOpenPopover] = useState(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState(null);
-  const [showAltPanel, setShowAltPanel] = useState(false);
+  // Slide Master editing has no docked side-panel slot (it's a full-screen
+  // overlay), so it keeps its own local floating panel instead of the
+  // lifted, mutually-exclusive side-panel state used by normal editing.
+  const [showAltPanelMaster, setShowAltPanelMaster] = useState(false);
+  const showAltPanel = isSlideMasterOpen ? showAltPanelMaster : showAltText;
+  const toggleAltPanel = () => {
+    if (isSlideMasterOpen) setShowAltPanelMaster((v) => !v);
+    else onToggleAltText?.();
+  };
+  const closeAltPanel = () => {
+    if (isSlideMasterOpen) setShowAltPanelMaster(false);
+    else onToggleAltText?.(false);
+  };
+  const isImage = media?.["media-type"] !== "video";
+
+  // Alt text only has any effect on images (<video> has no alt attribute),
+  // so close the panel whenever the selection stops being an image -
+  // switching to a video, another element, or nothing selected.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!isImage && showAltPanel) closeAltPanel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isImage]);
   const changeInputRef = useRef(null);
   const [stylePickerPos, setStylePickerPos] = useState(null);
   const [galleryPage, setGalleryPage] = useState(0);
@@ -1272,19 +1294,21 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
       <div className="ribbon-group">
         <button
           className={`toolbar-item${showAltPanel ? " pft-active" : ""}`}
-          onClick={() => setShowAltPanel((v) => !v)}
-          title="Alt Text"
+          onClick={toggleAltPanel}
+          title={isImage ? "Alt Text" : "Alt Text is not supported for video"}
+          disabled={!isImage}
         >
           <MdAccessibility /><span>Alt Text</span>
         </button>
         <div className="ribbon-group-title">Accessibility</div>
       </div>
 
-      {showAltPanel && (
+      {isSlideMasterOpen && showAltPanel && (
         <AltTextPanel
           media={media}
           onUpdate={onUpdate}
-          onClose={() => setShowAltPanel(false)}
+          onClose={closeAltPanel}
+          overlay
         />
       )}
 

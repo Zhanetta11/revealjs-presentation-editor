@@ -333,8 +333,6 @@ describe("layoutOperations", () => {
 
     const extra = slide.contents.text.find((el) => el.id === "text-extra");
     expect(extra.position).toEqual({ x: 5, y: 5 });
-    // placeholder-id is intentionally kept (not stripped) so switching back
-    // to a layout with a matching placeholder later restores this element.
     expect(extra["placeholder-id"]).toBe("old-extra");
 
     const image = slide.contents.media.find(
@@ -357,11 +355,37 @@ describe("layoutOperations", () => {
     const title = updated.slideset.slides[0].contents.text[0];
 
     expect(title.paragraphs[0].runs[0].text).toBe("Original title");
-    // placeholder-id is intentionally kept (not stripped) so switching back
-    // to a layout with a matching placeholder later restores this element.
     expect(title["placeholder-id"]).toBe("title");
     expect(title["pos-type"]).toBeUndefined();
     expect(updated.slideset.slides[0].contents.media).toEqual([]);
+  });
+
+  test("carries edited text into a same-role placeholder with a different id", () => {
+    const presentation = createPresentation();
+    presentation.slideset.layouts[0].placeholders[0].role = "title";
+    presentation.slideset.layouts.push({
+      "layout-id": "other",
+      placeholders: [
+        {
+          "placeholder-id": "different-title-id",
+          type: "text",
+          role: "title",
+          position: { x: 50, y: 60 },
+          width: 500,
+          height: 100,
+        },
+      ],
+    });
+    presentation.slideset.slides[0].contents.text[0].userModified = true;
+
+    const updated = applyLayoutToSlide(presentation, 0, "other");
+    const texts = updated.slideset.slides[0].contents.text;
+
+    const carried = texts.find((el) => el["placeholder-id"] === "different-title-id");
+    expect(carried).toBeDefined();
+    expect(carried.paragraphs[0].runs[0].text).toBe("Original title");
+    expect(carried.position).toEqual({ x: 50, y: 60 });
+    expect(texts.filter((el) => el["placeholder-id"] === "different-title-id")).toHaveLength(1);
   });
 
   test("reset restores layout geometry without forgetting edited content", () => {

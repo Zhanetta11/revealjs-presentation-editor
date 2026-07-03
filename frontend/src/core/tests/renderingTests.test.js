@@ -152,32 +152,32 @@ describe("getMediaElements", () => {
 
 describe("buildTextElementStyle", () => {
   it("uses coordinates from text element", () => {
-    const style = buildTextElementStyle(makeTextElement(), 0);
+    const style = buildTextElementStyle(makeTextElement());
     expect(style.left).toBe("100px");
     expect(style.top).toBe("200px");
   });
 
   it("uses width and height from text element", () => {
-    const style = buildTextElementStyle(makeTextElement(), 0);
+    const style = buildTextElementStyle(makeTextElement());
     expect(style.width).toBe("400px");
     expect(style.height).toBe("100px");
   });
 
   it("uses formatting from first paragraph", () => {
-    const style = buildTextElementStyle(makeTextElement(), 0);
+    const style = buildTextElementStyle(makeTextElement());
     expect(style.fontSize).toBe("32px");
     expect(style.fontWeight).toBe("bold");
     expect(style.color).toBe("#000000");
   });
 
-  it("uses fallback font size when no formatting", () => {
+  it("resolves font size through master formatting before the fallback", () => {
     const element = makeTextElement({ paragraphs: [{ id: "p", runs: [{ text: "x" }] }] });
-    const style = buildTextElementStyle(element, 0);
-    expect(style.fontSize).toBe("44px");
+    expect(buildTextElementStyle(element, { size: "30px" }).fontSize).toBe("30px");
+    expect(buildTextElementStyle(element).fontSize).toBe("24px");
   });
 
   it("position is absolute", () => {
-    const style = buildTextElementStyle(makeTextElement(), 0);
+    const style = buildTextElementStyle(makeTextElement());
     expect(style.position).toBe("absolute");
   });
 

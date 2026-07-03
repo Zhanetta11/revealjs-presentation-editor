@@ -311,6 +311,19 @@ ipcMain.handle('dialog:showMessage', async (event, title, message) => {
   });
 });
 
+ipcMain.handle('dialog:confirm', async (event, title, message) => {
+  requireTrustedSender(event);
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    buttons: ['OK', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+    title: String(title).slice(0, 100),
+    message: String(message).slice(0, 4000),
+  });
+  return result.response === 0;
+});
+
 ipcMain.handle('dialog:pickLinkTarget', async (event) => {
   requireTrustedSender(event);
   const result = await dialog.showOpenDialog(mainWindow, {

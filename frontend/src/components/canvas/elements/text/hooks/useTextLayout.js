@@ -23,10 +23,7 @@ export default function useTextLayout({
         const info = paragraphListInfos[index];
         paragraph.style.paddingLeft = info?.listType
           ? `calc(${getListIndent(info.listLevel, info.listType)} + 1.2em)`
-          : getListIndent(
-              Math.max(0, (info?.listLevel ?? 0) - 1),
-              info?.listLevel > 0 ? "indent" : null,
-            );
+          : getListIndent(info?.listLevel ?? 0, "indent");
       });
 
       const nextTops = paragraphElements.map(

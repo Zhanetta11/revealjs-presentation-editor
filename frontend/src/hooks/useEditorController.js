@@ -23,6 +23,7 @@ import { getPresentationTitle } from "../core/utils/presentationUtils";
 import { getSlideTransition } from "../core/model/transitionDefaults";
 import { importPresentationFromJson } from "../core/persistence/importPresentation";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
+import { showErrorDialog, confirmDialog } from "../core/platform/dialogs";
 import { isQuotaExceededError } from "../core/persistence/storageErrors";
 import { createTextElementDefaults } from "../core/model/masterDefaults";
 import { createLayoutPlaceholder } from "../core/model/defaultLayouts";
@@ -554,13 +555,18 @@ export function useEditorController() {
 useEffect(() => {
   if (currentView === "reading") {
     const id = setTimeout(() => {
-      setPreviewStartSlide(selectedSlideIndex);
+      const allSlides = presentation?.slideset?.slides ?? [];
+      const visibleBefore = allSlides
+        .slice(0, selectedSlideIndex)
+        .filter((s) => !s.hidden).length;
+      const lastVisibleIndex = allSlides.filter((s) => !s.hidden).length - 1;
+      setPreviewStartSlide(Math.max(0, Math.min(visibleBefore, lastVisibleIndex)));
       openPreview();
       setCurrentView("normal");
     }, 0);
     return () => clearTimeout(id);
   }
-}, [currentView, selectedSlideIndex, openPreview, setCurrentView]);
+}, [currentView, selectedSlideIndex, openPreview, setCurrentView, presentation]);
 
   const layouts = getLayoutDisplayList(presentation);
 
@@ -865,7 +871,7 @@ useEffect(() => {
         ({ key } = await storeMediaFile(file));
       } catch (error) {
         console.error("[Editor] Failed to store background image:", error);
-        window.alert(`Could not set the background image: ${error?.message ?? "unknown error"}`);
+        showErrorDialog("Upload Failed", `Could not set the background image: ${error?.message ?? "unknown error"}`);
         return;
       }
       eventBus.dispatch(
@@ -1290,7 +1296,7 @@ useEffect(() => {
         ]);
       } catch (error) {
         console.error("[Editor] Failed to store placeholder image:", error);
-        window.alert(`Could not add the image: ${error?.message ?? "unknown error"}`);
+        showErrorDialog("Upload Failed", `Could not add the image: ${error?.message ?? "unknown error"}`);
         return;
       }
       const phW = placeholderElement.width ?? naturalSize.width;
@@ -1331,7 +1337,7 @@ useEffect(() => {
         ]);
       } catch (error) {
         console.error("[Editor] Failed to store placeholder video:", error);
-        window.alert(`Could not add the video: ${error?.message ?? "unknown error"}`);
+        showErrorDialog("Upload Failed", `Could not add the video: ${error?.message ?? "unknown error"}`);
         return;
       }
       const phW = placeholderElement.width ?? naturalSize.width;
@@ -1636,7 +1642,8 @@ useEffect(() => {
 
   const handleDeleteAndGoHome = useCallback(async () => {
     if (!presentationId) return;
-    const ok = window.confirm(
+    const ok = await confirmDialog(
+      "Delete Presentation",
       "Delete this presentation? This cannot be undone.",
     );
     if (!ok) return;
@@ -1967,7 +1974,7 @@ useEffect(() => {
             .join("");
         }
         if (mode === "title") {
-          return text.replace(
+          return text.toLocaleLowerCase().replace(
             /(^|[\s([{'"“‘-])(\p{L})/gu,
             (_, prefix, letter) => prefix + letter.toLocaleUpperCase(),
           );
@@ -2018,24 +2025,22 @@ useEffect(() => {
             ? selection.rangeEnd
             : paragraphLength;
 
+        // Transform the paragraph text as one string, then slice it back per
+        // run. Case transforms keep the length, and transforming run-by-run
+        // would make word/sentence detection restart at every formatting
+        // boundary (e.g. a bold span mid-word got its letter capitalized).
+        const fullText = (paragraph.runs ?? []).map((run) => run.text ?? "").join("");
+        const transformedText =
+          fullText.slice(0, start) +
+          transform(fullText.slice(start, end)) +
+          fullText.slice(end);
         let offset = 0;
         paragraph.runs = (paragraph.runs ?? []).map((run) => {
           const runText = run.text ?? "";
           const runStart = offset;
           const runEnd = runStart + runText.length;
           offset = runEnd;
-          const overlapStart = Math.max(start, runStart);
-          const overlapEnd = Math.min(end, runEnd);
-          if (overlapStart >= overlapEnd) return run;
-          const localStart = overlapStart - runStart;
-          const localEnd = overlapEnd - runStart;
-          return {
-            ...run,
-            text:
-              runText.slice(0, localStart) +
-              transform(runText.slice(localStart, localEnd)) +
-              runText.slice(localEnd),
-          };
+          return { ...run, text: transformedText.slice(runStart, runEnd) };
         });
       });
 
@@ -2132,9 +2137,17 @@ useEffect(() => {
   }, []);
 
   const handleOpenPreviewFromCurrent = useCallback(() => {
-    setPreviewStartSlide(selectedSlideIndex);
+    // The preview deck only contains visible slides, so the raw slide index
+    // must be mapped to the index within the visible ones. When the current
+    // slide itself is hidden this lands on the next visible slide.
+    const allSlides = presentation?.slideset?.slides ?? [];
+    const visibleBefore = allSlides
+      .slice(0, selectedSlideIndex)
+      .filter((s) => !s.hidden).length;
+    const lastVisibleIndex = allSlides.filter((s) => !s.hidden).length - 1;
+    setPreviewStartSlide(Math.max(0, Math.min(visibleBefore, lastVisibleIndex)));
     openPreview();
-  }, [openPreview, selectedSlideIndex]);
+  }, [openPreview, selectedSlideIndex, presentation]);
 
   const handleToggleSlideHidden = useCallback(
     () => toggleSlideHidden(selectedSlideIndex),

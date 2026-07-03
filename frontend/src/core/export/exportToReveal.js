@@ -21,7 +21,12 @@ import {
   buildAnimationMap,
   styleToString,
 } from "../render/revealRenderer";
-import { isSafeLinkHref, resolveParagraphIndentStyles } from "../text/textFormatting";
+import {
+  isSafeLinkHref,
+  resolveParagraphIndentStyles,
+  resolveTextStyle,
+  validStyleValue,
+} from "../text/textFormatting";
 import {
   getListMarker,
   getListIndent,
@@ -225,16 +230,7 @@ function applyFragment(innerHtml, wrapperStyle, animation) {
   return `<div class="${classes}" ${dataAttrs} style="${wrapperStyle}">${innerHtml}</div>`;
 }
 
-const validStyleValue = (value) => {
-  if (value == null || value === "undefined") return undefined;
-  if (typeof value === "string" && /["'<>;{}]|url\s*\(/i.test(value)) return undefined;
-  return value;
-};
-
-const resolveStyleValue = (own, placeholder, master) =>
-  validStyleValue(own)
-  ?? validStyleValue(placeholder)
-  ?? validStyleValue(master);
+const resolveStyleValue = resolveTextStyle;
 
 export function buildPStyle(
   paragraphFormatting,
@@ -412,8 +408,8 @@ function buildMasterElementsHtml(presentation, masterFormatting, getSrc) {
   const textElements = masterElements.text ?? [];
   const mediaElements = masterElements.media ?? [];
 
-  const textsHtml = textElements.filter((element) => !element.hidden).map((el, index) => {
-    const style = styleToString(buildTextElementStyle(el, index, masterFormatting, {}));
+  const textsHtml = textElements.filter((element) => !element.hidden).map((el) => {
+    const style = styleToString(buildTextElementStyle(el, masterFormatting, {}));
     const content = buildTextElementContent(el, null);
     return `<div style="${style}">${content}</div>`;
   }).join("");
@@ -522,13 +518,13 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
 
   const textElementsHtml = textElements
     .filter((element) => !element.hidden)
-    .map((textElement, index) => {
+    .map((textElement) => {
       const animation = animationMap.get(textElement.id);
       const sequenceMode = animation?.["effect-options"]?.sequence ?? "as-one-object";
       const placeholderFormatting = getPlaceholderFormatting(presentation, slide, textElement);
       const placeholderPadding = getPlaceholderPadding(presentation, slide, textElement);
       const placeholderBackground = getPlaceholderBackground(presentation, slide, textElement);
-      const style = styleToString(buildTextElementStyle(textElement, index, masterFormatting, placeholderFormatting, placeholderPadding, placeholderBackground));
+      const style = styleToString(buildTextElementStyle(textElement, masterFormatting, placeholderFormatting, placeholderPadding, placeholderBackground));
       const adjustedAnim = animation && adjustedSeqMap.has(animation.id)
         ? { ...animation, sequence: adjustedSeqMap.get(animation.id) }
         : animation;

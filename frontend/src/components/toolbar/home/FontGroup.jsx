@@ -12,6 +12,7 @@ import {
   MdFontDownload,
 } from "react-icons/md";
 import ColorPicker from "../../canvas/tools/ColorPicker";
+import { confirmDialog } from "../../../core/platform/dialogs";
 import "./FontGroup.css";
 
 const SIZES = [
@@ -277,9 +278,10 @@ export default function FontGroup({
     }
   };
 
-  const removeCurrentFont = () => {
+  const removeCurrentFont = async () => {
     if (!canRemoveCurrentFont) return;
-    const confirmed = window.confirm(
+    const confirmed = await confirmDialog(
+      "Remove Font",
       `Remove the uploaded font "${currentFont}"?`,
     );
     if (!confirmed) return;
@@ -299,7 +301,12 @@ export default function FontGroup({
             if (event.target.value) fmt({ font: event.target.value });
           }}
         >
-          {currentFont === "" && <option value="">—</option>}
+          {/* Also cover a font value that's not in the list (e.g. text still
+              referencing a removed uploaded font): without a matching option
+              the controlled select gets stuck and stops firing onChange. */}
+          {!fonts.includes(currentFont) && (
+            <option value={currentFont}>{currentFont || "—"}</option>
+          )}
           {fonts.map((font) => (
             <option key={font} value={font} style={{ fontFamily: font }}>
               {font}

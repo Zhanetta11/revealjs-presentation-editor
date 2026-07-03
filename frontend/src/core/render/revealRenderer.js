@@ -16,14 +16,14 @@ import {
 } from "../render/slidesetRenderUtils";
 import { getStyleById } from "../model/imageStyles";
 import { clampCrop, getCroppedMediaGeometry } from "../model/mediaCrop";
+import { resolveTextStyle } from "../text/textFormatting";
 
 function findById(list, id) { return id ? list.find((p) => p.id === id) : null; }
 
-export function buildTextElementStyle(textElement, index, masterFormatting = {}, placeholderFormatting = {}, placeholderPadding = null, placeholderBackground = null) {
+export function buildTextElementStyle(textElement, masterFormatting = {}, placeholderFormatting = {}, placeholderPadding = null, placeholderBackground = null) {
   const formatting = textElement.paragraphs?.[0]?.formatting ?? {};
   const rotation = textElement.rotation ?? 0;
-  const valid = (v) => (v != null && v !== "undefined" ? v : undefined);
-  const r = (elemVal, phVal, masterVal, fallback) => valid(elemVal) ?? valid(phVal) ?? valid(masterVal) ?? fallback;
+  const r = resolveTextStyle;
 
   const textDecoration = r(formatting["text-decoration"], placeholderFormatting["text-decoration"], masterFormatting["text-decoration"], null);
   const verticalAlign = r(formatting["vertical-align"], placeholderFormatting["vertical-align"], masterFormatting["vertical-align"], "top");
@@ -41,8 +41,8 @@ export function buildTextElementStyle(textElement, index, masterFormatting = {},
     display: "flex",
     flexDirection: "column",
     justifyContent,
-    fontSize: r(formatting.size, placeholderFormatting.size, masterFormatting.size, index === 0 ? "44px" : "28px"),
-    fontWeight: r(formatting.weight, placeholderFormatting.weight, masterFormatting.weight, index === 0 ? "bold" : "normal"),
+    fontSize: r(formatting.size, placeholderFormatting.size, masterFormatting.size, "24px"),
+    fontWeight: r(formatting.weight, placeholderFormatting.weight, masterFormatting.weight, "normal"),
     fontStyle: r(formatting.italics, placeholderFormatting.italics, masterFormatting.italics, false) ? "italic" : "normal",
     fontFamily: r(formatting.font, placeholderFormatting.font, masterFormatting.font, "inherit"),
     color: r(formatting.color, placeholderFormatting.color, masterFormatting.color, "var(--text-dark, black)"),

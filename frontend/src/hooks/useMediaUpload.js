@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { storeMediaFile } from "../core/persistence/persistenceFacade";
 import { createImageMediaElement, createVideoMediaElement } from "../core/operations/mediaOperations";
+import { showErrorDialog } from "../core/platform/dialogs";
 
 function readImageDimensions(file) {
   return new Promise((resolve) => {
@@ -44,7 +45,7 @@ function fitToSlide(width, height, slideWidth, slideHeight) {
 
 function reportUploadError(kind, error) {
   console.error(`[MediaUpload] Failed to add ${kind}:`, error);
-  window.alert(`Could not add the ${kind}: ${error?.message ?? "unknown error"}`);
+  showErrorDialog("Upload Failed", `Could not add the ${kind}: ${error?.message ?? "unknown error"}`);
 }
 
 export function useMediaUpload(addMedia, slideWidth = 1280, slideHeight = 720) {

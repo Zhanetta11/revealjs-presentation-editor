@@ -217,7 +217,6 @@ export default function PreviewModal({ slides, presentation, onClose, initialSli
                       const placeholderBackground = getPlaceholderBackground(presentation, slide, textElement);
                       const baseStyle = buildTextElementStyle(
                         textElement,
-                        index,
                         masterFormatting,
                         placeholderFormatting,
                         placeholderPadding,

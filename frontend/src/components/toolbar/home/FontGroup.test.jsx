@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import FontGroup from "./FontGroup";
 
 const CUSTOM_FONT = "MyCustomFont";
@@ -60,7 +60,7 @@ describe("FontGroup — remove font button", () => {
     ).toBeDisabled();
   });
 
-  test("clicking remove button shows confirm and calls onFontRemove on confirm", () => {
+  test("clicking remove button shows confirm and calls onFontRemove on confirm", async () => {
     const onFontRemove = vi.fn();
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderGroup({
@@ -69,12 +69,12 @@ describe("FontGroup — remove font button", () => {
       onFontRemove,
     });
     fireEvent.click(screen.getByRole("button", { name: /remove uploaded font/i }));
+    await waitFor(() => expect(onFontRemove).toHaveBeenCalledWith(CUSTOM_FONT));
     expect(window.confirm).toHaveBeenCalled();
-    expect(onFontRemove).toHaveBeenCalledWith(CUSTOM_FONT);
     vi.restoreAllMocks();
   });
 
-  test("clicking remove button does NOT call onFontRemove when confirm is cancelled", () => {
+  test("clicking remove button does NOT call onFontRemove when confirm is cancelled", async () => {
     const onFontRemove = vi.fn();
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderGroup({
@@ -83,6 +83,7 @@ describe("FontGroup — remove font button", () => {
       onFontRemove,
     });
     fireEvent.click(screen.getByRole("button", { name: /remove uploaded font/i }));
+    await waitFor(() => expect(window.confirm).toHaveBeenCalled());
     expect(onFontRemove).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });

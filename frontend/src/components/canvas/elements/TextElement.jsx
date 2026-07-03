@@ -269,7 +269,6 @@ export default function TextElement({
     el.innerHTML = innerHTML;
     lastTypedHTMLRef.current = innerHTML;
 
-
     if (wasFocused) {
       if (savedSel) {
         restoreSelectionToDOM(el, textElement.paragraphs, savedSel);
@@ -278,6 +277,35 @@ export default function TextElement({
       }
     }
   }, [innerHTML, savedSelectionRef, textElement.paragraphs]);
+
+  const wasPrimarySelectedRef = useRef(isPrimarySelected);
+  useEffect(() => {
+    const wasSelected = wasPrimarySelectedRef.current;
+    wasPrimarySelectedRef.current = isPrimarySelected;
+    if (isPrimarySelected || !wasSelected) return;
+
+    const el = editableRef.current;
+    const currentText = el?.innerText?.replace(/\u00a0/g, " ").trim() ?? "";
+    if (isContentPlaceholder && currentText === "") {
+      const promptParagraphs = createPromptParagraphs(
+        textElement.paragraphs,
+        "Click to add text",
+      );
+      const promptHTML = paragraphsToHTML(
+        promptParagraphs,
+        masterFormatting,
+        placeholderFormatting,
+      );
+      if (el) el.innerHTML = promptHTML;
+      lastTypedHTMLRef.current = promptHTML;
+      onChangeParagraphs?.(textElement.id, promptParagraphs, true, false);
+    }
+    if (isDeletingRef.current || isTypingRef.current) {
+      isDeletingRef.current = false;
+      isTypingRef.current = false;
+      onCommitHistory?.();
+    }
+  }, [isPrimarySelected]);
 
   const handleFormat = (id, updates) => {
     if (isDeletingRef.current || isTypingRef.current) {

@@ -161,11 +161,11 @@ export default function SlideThumbnail({
           layoutId={slide?.["layout-id"]}
           slideContentIds={getSlideContentIds(slide)}
         />
-        {textElements.filter((element) => !element.hidden).map((textElement, index) => {
+        {textElements.filter((element) => !element.hidden).map((textElement) => {
           const placeholderFormatting = getPlaceholderFormatting(presentation, slide, textElement);
           const placeholderPadding = getPlaceholderPadding(presentation, slide, textElement);
           const placeholderBackground = getPlaceholderBackground(presentation, slide, textElement);
-          const style = buildTextElementStyle(textElement, index, masterFormatting, placeholderFormatting, placeholderPadding, placeholderBackground);
+          const style = buildTextElementStyle(textElement, masterFormatting, placeholderFormatting, placeholderPadding, placeholderBackground);
           if (isEmptyPlaceholderPrompt(textElement)) {
             const bg = style.background;
             const highlight = placeholderFormatting.highlight;

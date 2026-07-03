@@ -348,21 +348,63 @@ export const applyLayoutToSlide = (presentation, slideIndex, layoutId) => {
     placeholders.map((p) => [p["placeholder-id"], p])
   );
 
+  const oldLayout = getLayouts(presentation).find(
+    (l) => l["layout-id"] === slide["layout-id"],
+  );
+  const oldPlaceholderById = new Map(
+    (oldLayout?.placeholders ?? []).map((p) => [p["placeholder-id"], p]),
+  );
+  const usedNewPids = new Set();
+  for (const el of [...(slide.contents?.text ?? []), ...(slide.contents?.media ?? [])]) {
+    const pid = el["placeholder-id"];
+    if (pid && placeholderMap.has(pid)) usedNewPids.add(pid);
+  }
+
+  const roleBucket = (role) => ((role ?? "body") === "title" ? "title" : "body");
+
+  const findRoleMatch = (el) => {
+    const oldPlaceholder = oldPlaceholderById.get(el["placeholder-id"]);
+    if (!oldPlaceholder) return null;
+    const elementIsMedia = el["media-type"] !== undefined;
+    const wantedBucket = roleBucket(oldPlaceholder.role);
+    const candidates = placeholders.filter((p) => {
+      const pid = p["placeholder-id"];
+      if (!pid || usedNewPids.has(pid)) return false;
+      const placeholderIsMedia = p.type === "image" || p.type === "video";
+      return placeholderIsMedia === elementIsMedia;
+    });
+    return (
+      candidates.find((p) => roleBucket(p.role) === wantedBucket) ??
+      (elementIsMedia ? null : candidates[0]) ??
+      null
+    );
+  };
+
+  const applyPlaceholderGeometry = (el, placeholder) => ({
+    ...el,
+    "placeholder-id": placeholder["placeholder-id"],
+    position: { ...placeholder.position },
+    width: placeholder.width,
+    height: placeholder.height,
+    rotation: placeholder.rotation ?? el.rotation ?? 0,
+    background: placeholder.background ?? el.background,
+  });
+
   const processElement = (el, isModified) => {
     const pid = el["placeholder-id"];
     const match = pid ? placeholderMap.get(pid) : null;
     if (match) {
-      const updated = {
-        ...el,
-        position: { ...match.position },
-        width: match.width,
-        height: match.height,
-        rotation: match.rotation ?? el.rotation ?? 0,
-        background: match.background ?? el.background,
-      };
-      return { updated };
+      return { updated: applyPlaceholderGeometry(el, match) };
     }
-    if (!pid || isModified(el)) return { kept: el };
+    if (!pid) return { kept: el };
+    if (isModified(el)) {
+      const roleMatch = findRoleMatch(el);
+      if (roleMatch) {
+        usedNewPids.add(roleMatch["placeholder-id"]);
+        return { updated: applyPlaceholderGeometry(el, roleMatch) };
+      }
+      return { kept: el };
+    }
     return { remove: true };
   };
 

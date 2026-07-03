@@ -146,6 +146,12 @@ export default function FormatToolbar({
             title="Font"
           >
             {currentFont === "" && <option value="">—</option>}
+            {/* A font value not in the list (e.g. text still referencing a
+                removed uploaded font) needs its own option, otherwise the
+                controlled select gets stuck and stops firing onChange. */}
+            {currentFont !== "" && !fonts.includes(currentFont) && (
+              <option value={currentFont}>{currentFont}</option>
+            )}
             {fonts.map((font) => (
               <option key={font} value={font} style={{ fontFamily: font }}>
                 {font}

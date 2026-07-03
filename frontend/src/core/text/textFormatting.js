@@ -6,9 +6,9 @@ import {
   LIST_MARKER_WIDTH_EM,
 } from "../utils/listUtils";
 
-const validStyleValue = (v) => {
+export const validStyleValue = (v) => {
   if (v == null || v === "undefined") return undefined;
-  if (typeof v === "string" && /[;{}<>]|url\s*\(/i.test(v)) return undefined;
+  if (typeof v === "string" && /["'<>;{}]|url\s*\(/i.test(v)) return undefined;
   return v;
 };
 
@@ -367,7 +367,7 @@ export const paragraphsToHTML = (paragraphs, masterFormatting = {}, placeholderF
   return (paragraphs ?? [])
     .map((paragraph, index) => {
       const formatting = paragraph.formatting ?? {};
-      const r = (elemVal, phVal, masterVal) => validStyleValue(elemVal) ?? validStyleValue(phVal) ?? validStyleValue(masterVal);
+      const r = resolveTextStyle;
 
       const rawListType = r(formatting["list-type"], placeholderFormatting["list-type"], masterFormatting["list-type"]);
       const listType = rawListType && rawListType !== "none" ? rawListType : null;
@@ -509,11 +509,8 @@ export const getSelectionFormatting = (textElement, selection) => {
 export function migrateParagraphFormatting(paragraphs, placeholderFormatting, masterFormatting = {}) {
   if (!paragraphs) return paragraphs;
   return paragraphs.map((p) => {
-    const userSetKeys = new Set(p.userSetKeys ?? []);
-
     const f = { ...(p.formatting ?? {}) };
     for (const key of Object.keys(f)) {
-      if (userSetKeys.has(key)) continue;
       if (key in placeholderFormatting) {
         if (f[key] === placeholderFormatting[key]) delete f[key];
       } else if (key in masterFormatting) {

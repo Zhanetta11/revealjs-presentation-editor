@@ -10,12 +10,28 @@ export function addFontEntry(presentation, fontEntry) {
   };
 }
 
+const FALLBACK_FONT = "Arial";
+
+const scrubFontReferences = (value, fontId) => {
+  if (Array.isArray(value)) return value.map((item) => scrubFontReferences(item, fontId));
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key,
+      key === "font" && child === fontId
+        ? FALLBACK_FONT
+        : scrubFontReferences(child, fontId),
+    ]),
+  );
+};
+
 export function removePresentationFont(presentation, fontId) {
+  const scrubbed = scrubFontReferences(presentation, fontId);
   return {
-    ...presentation,
+    ...scrubbed,
     slideset: {
-      ...presentation.slideset,
-      fonts: (presentation.slideset.fonts ?? []).filter((f) => f["font-id"] !== fontId),
+      ...scrubbed.slideset,
+      fonts: (scrubbed.slideset.fonts ?? []).filter((f) => f["font-id"] !== fontId),
     },
   };
 }

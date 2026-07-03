@@ -439,12 +439,12 @@ describe("migrateParagraphFormatting", () => {
     expect(result[0].formatting["list-type"]).toBe("bullets");
   });
 
-  it("preserves key in userSetKeys even when it matches placeholder (explicit user override)", () => {
+  it("drops a paragraph key that duplicates the placeholder value", () => {
     const paragraphs = [
-      { formatting: { align: "center" }, userSetKeys: ["align"], runs: [] },
+      { formatting: { align: "center" }, runs: [] },
     ];
     const result = migrateParagraphFormatting(paragraphs, { align: "center" });
-    expect(result[0].formatting.align).toBe("center");
+    expect(result[0].formatting.align).toBeUndefined();
   });
 
   it("handles null paragraphs gracefully", () => {

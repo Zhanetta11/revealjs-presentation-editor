@@ -632,6 +632,9 @@ export default function SlideMasterView({
   onBringForward,
   onSendBackward,
   onSendToBack,
+  formatPainterClipboard = null,
+  onFormatPainterCopy,
+  onFormatPainterPaste,
 }) {
   const [canvasZoom, setCanvasZoom] = useState(75);
   const canvasAreaRef = useRef(null);
@@ -750,6 +753,9 @@ export default function SlideMasterView({
           onBringForward={onBringForward}
           onSendBackward={onSendBackward}
           onSendToBack={onSendToBack}
+          formatPainterClipboard={formatPainterClipboard}
+          onFormatPainterCopy={onFormatPainterCopy}
+          onFormatPainterPaste={onFormatPainterPaste}
         />
         <div className="master-canvas-label">
           {selectedMasterLayoutId === null

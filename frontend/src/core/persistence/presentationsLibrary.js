@@ -69,14 +69,19 @@ export function updateIndexEntry(id, title) {
   });
 }
 
-export function deletePresentation(id) {
+export function deletePresentation(
+  id,
+  { presentation: presentationOverride = null, deleteMedia = true } = {},
+) {
   return withIndexLock(async () => {
     const index = await getIndex();
-    const raw = await storageAdapter.get(presentationKey(id));
-    let presentation = null;
-    try {
-      presentation = typeof raw === "string" ? JSON.parse(raw) : raw;
-    } catch {}
+    let presentation = presentationOverride;
+    if (!presentation) {
+      const raw = await storageAdapter.get(presentationKey(id));
+      try {
+        presentation = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch {}
+    }
     const mediaKeys = new Set();
     const findMediaKeys = (value, target = mediaKeys) => {
       if (Array.isArray(value)) return value.forEach((child) => findMediaKeys(child, target));
@@ -93,20 +98,22 @@ export function deletePresentation(id) {
         }
       }
     };
-    findMediaKeys(presentation);
-    const otherPresentationKeys = (await storageAdapter.getAllKeys()).filter(
-      (key) => String(key).startsWith("presentation-") && key !== presentationKey(id),
-    );
-    for (const key of otherPresentationKeys) {
-      try {
-        const otherRaw = await storageAdapter.get(key);
-        const other = typeof otherRaw === "string" ? JSON.parse(otherRaw) : otherRaw;
-        const sharedKeys = new Set();
-        findMediaKeys(other, sharedKeys);
-        sharedKeys.forEach((sharedKey) => mediaKeys.delete(sharedKey));
-      } catch {
-        mediaKeys.clear();
-        break;
+    if (deleteMedia) {
+      findMediaKeys(presentation);
+      const otherPresentationKeys = (await storageAdapter.getAllKeys()).filter(
+        (key) => String(key).startsWith("presentation-") && key !== presentationKey(id),
+      );
+      for (const key of otherPresentationKeys) {
+        try {
+          const otherRaw = await storageAdapter.get(key);
+          const other = typeof otherRaw === "string" ? JSON.parse(otherRaw) : otherRaw;
+          const sharedKeys = new Set();
+          findMediaKeys(other, sharedKeys);
+          sharedKeys.forEach((sharedKey) => mediaKeys.delete(sharedKey));
+        } catch {
+          mediaKeys.clear();
+          break;
+        }
       }
     }
     await storageAdapter.set(
@@ -114,8 +121,12 @@ export function deletePresentation(id) {
       index.filter((p) => p.id !== id),
     );
     await storageAdapter.remove(presentationKey(id));
-    await Promise.all([...mediaKeys].map((key) => storageAdapter.remove(key)));
+    await Promise.allSettled([...mediaKeys].map((key) => storageAdapter.remove(key)));
   });
+}
+
+export function deleteDraftManifest(id) {
+  return deletePresentation(id, { deleteMedia: false });
 }
 
 export async function loadPresentation(id) {

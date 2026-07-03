@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { getIndex } from "../core/persistence/persistenceFacade";
+import {
+  getIndex,
+  getProjectPresentationSources,
+  openElectronProjectFolder,
+} from "../core/persistence/persistenceFacade";
 import { importPresentationFromJson } from "../core/persistence/importPresentation";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
 import { supportsFileSystemAccess } from "../core/platform/fileSystemAccess";
@@ -17,14 +21,15 @@ export const usesProjectFolders = () => isElectron() || supportsFileSystemAccess
 
 export function useProjectLibrary() {
   const [presentations, setPresentations] = useState([]);
-  const [linkedIds, setLinkedIds] = useState([]);
+  const [projectBackedIds, setProjectBackedIds] = useState([]);
   const [recentProjects, setRecentProjects] = useState([]);
 
   const refresh = useCallback(async () => {
     getIndex().then(setPresentations);
     if (isElectron()) {
       const api = getElectronAPI();
-      api.getLinkedPresentationIds().then(setLinkedIds);
+      getProjectPresentationSources()
+        .then((sources) => setProjectBackedIds(sources.map((source) => source.presentationId)));
       const paths = await api.getRecentProjects();
       const entries = await Promise.all(
         paths.map(async (path) => {
@@ -40,7 +45,7 @@ export function useProjectLibrary() {
       );
       setRecentProjects(entries.filter(Boolean));
     } else if (supportsFileSystemAccess()) {
-      getBrowserLinkedPresentationIds().then(setLinkedIds);
+      getBrowserLinkedPresentationIds().then(setProjectBackedIds);
       const entries = await getBrowserRecentProjects();
       setRecentProjects(entries.map((e) => ({ key: e.id, title: e.title, updatedAt: e.updatedAt })));
     }
@@ -51,26 +56,22 @@ export function useProjectLibrary() {
   }, [refresh]);
 
   const draftPresentations = usesProjectFolders()
-    ? presentations.filter((p) => !linkedIds.includes(p.id))
+    ? presentations.filter((p) => !projectBackedIds.includes(p.id))
     : [];
 
   return { presentations, recentProjects, draftPresentations, refresh };
 }
 
 export async function openRecentProject(key) {
-  const jsonText = isElectron()
-    ? await getElectronAPI().openRecentProject(key)
-    : await openBrowserRecentProject(key);
-  const readFile = isElectron()
-    ? (relativePath) => getElectronAPI().readProjectMediaFile(key, relativePath)
-    : (relativePath) => readMediaFileFromRecent(key, relativePath);
+  if (isElectron()) {
+    const { presentationId } = await openElectronProjectFolder(key);
+    return presentationId;
+  }
+  const jsonText = await openBrowserRecentProject(key);
+  const readFile = (relativePath) => readMediaFileFromRecent(key, relativePath);
   const rehydratedJsonText = await rehydrateProjectManifestJson(jsonText, readFile);
   const id = await importPresentationFromJson(rehydratedJsonText);
-  if (isElectron()) {
-    await getElectronAPI().linkPresentation(id, key);
-  } else {
-    await linkBrowserRecentProject(id, key);
-  }
+  await linkBrowserRecentProject(id, key);
   return id;
 }
 

@@ -40,6 +40,7 @@ export default function SlidesGroup({
   canDelete,
   onToggleSlideHidden,
   isSlideHidden,
+  isSlideMasterOpen = false,
 }) {
   const [showLayouts, setShowLayouts] = useState(false);
   const [showLayoutPanel, setShowLayoutPanel] = useState(false);
@@ -111,6 +112,8 @@ export default function SlidesGroup({
           ref={newSlideBtnRef}
           className="toolbar-item large"
           onClick={handleNewSlideToggle}
+          disabled={isSlideMasterOpen}
+          title={isSlideMasterOpen ? "Close Slide Master to add slides" : "New Slide"}
         >
           <MdAdd />
           <span>

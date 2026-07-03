@@ -9,6 +9,15 @@ const schema = {
     type: 'array',
     default: [],
   },
+  projectFoldersByPresentationId: {
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    default: {},
+  },
+  draftCleanupEligiblePresentationIds: {
+    type: 'array',
+    default: [],
+  },
   windowState: {
     type: 'object',
     properties: {

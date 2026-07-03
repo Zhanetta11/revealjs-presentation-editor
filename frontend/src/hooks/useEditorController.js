@@ -22,6 +22,7 @@ import {
 import { getPresentationTitle } from "../core/utils/presentationUtils";
 import { getSlideTransition } from "../core/model/transitionDefaults";
 import { importPresentationFromJson } from "../core/persistence/importPresentation";
+import { rehydrateProjectManifestJson } from "../core/persistence/projectMediaRehydrate";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
 import { showErrorDialog, confirmDialog } from "../core/platform/dialogs";
 import { isQuotaExceededError } from "../core/persistence/storageErrors";
@@ -38,13 +39,22 @@ import {
 } from "../core/export/exportToReveal";
 import {
   deletePresentation,
+  deleteDraftManifest,
   createPresentation,
   downloadPresentationAsJson,
   storeMediaFile,
+  createProjectSource,
+  createCommittingSource,
+  chooseElectronProjectFolder,
+  writeAndCommitElectronProjectSnapshot,
+  chooseElectronProjectToOpen,
+  openElectronProjectFolder,
 } from "../core/persistence/persistenceFacade";
 import { buildProjectManifest } from "../core/persistence/projectFolder";
+import { deserializePresentation } from "../core/persistence/serializationOperations";
 import { supportsFileSystemAccess } from "../core/platform/fileSystemAccess";
-import { saveProjectToBrowserFolder, getBrowserLinkedFolderName } from "../core/persistence/browserProjectFolder";
+import { saveProjectToBrowserFolder } from "../core/persistence/browserProjectFolder";
+import { openRecentProject } from "./useProjectLibrary";
 import {
   htmlToClipboardParagraphs,
   insertClipboardParagraphs,
@@ -159,110 +169,6 @@ const readClipboardPayload = async () => {
   return payload;
 };
 
-const renderClipboardParagraphsToPngFile = async (
-  paragraphs,
-  fallbackFormatting = {},
-) => {
-  if (!paragraphs?.length) return null;
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  const padding = 20;
-  const lineGap = 6;
-  const lines = paragraphs.map((paragraph) => {
-    const runs = paragraph.runs?.length
-      ? paragraph.runs
-      : [{ text: "", formatting: {} }];
-    const measured = runs.map((run) => {
-      const formatting = { ...fallbackFormatting, ...(run.formatting ?? {}) };
-      const size = Math.max(8, Number.parseFloat(formatting.size) || 24);
-      const font = formatting.font || "Arial";
-      const weight =
-        formatting.weight === true || formatting.weight === "bold"
-          ? "bold"
-          : formatting.weight || "normal";
-      const italics =
-        formatting.italics === true || formatting.italics === "italic"
-          ? "italic"
-          : "normal";
-      const fontSpec = `${italics} ${weight} ${size}px ${font}`;
-      context.font = fontSpec;
-      return {
-        run,
-        formatting,
-        size,
-        fontSpec,
-        width: context.measureText(run.text ?? "").width,
-      };
-    });
-    return {
-      runs: measured,
-      width: measured.reduce((sum, entry) => sum + entry.width, 0),
-      height: Math.max(...measured.map((entry) => entry.size * 1.3), 24),
-    };
-  });
-
-  canvas.width = Math.max(
-    1,
-    Math.ceil(Math.max(...lines.map((line) => line.width), 1) + padding * 2),
-  );
-  canvas.height = Math.max(
-    1,
-    Math.ceil(
-      lines.reduce((sum, line) => sum + line.height, 0) +
-        lineGap * Math.max(0, lines.length - 1) +
-        padding * 2,
-    ),
-  );
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.textBaseline = "alphabetic";
-
-  let y = padding;
-  for (const line of lines) {
-    let x = padding;
-    const baseline = y + line.height * 0.82;
-    for (const entry of line.runs) {
-      context.font = entry.fontSpec;
-      if (
-        entry.formatting.highlight &&
-        entry.formatting.highlight !== "transparent"
-      ) {
-        context.fillStyle = entry.formatting.highlight;
-        context.fillRect(x, y, entry.width, line.height);
-      }
-      context.fillStyle = entry.formatting.color || "#000000";
-      context.fillText(entry.run.text ?? "", x, baseline);
-      const decoration = entry.formatting["text-decoration"] ?? "";
-      context.strokeStyle = context.fillStyle;
-      context.lineWidth = Math.max(1, entry.size / 18);
-      if (decoration.includes("underline")) {
-        context.beginPath();
-        context.moveTo(x, baseline + entry.size * 0.1);
-        context.lineTo(x + entry.width, baseline + entry.size * 0.1);
-        context.stroke();
-      }
-      if (decoration.includes("line-through")) {
-        context.beginPath();
-        context.moveTo(x, baseline - entry.size * 0.3);
-        context.lineTo(x + entry.width, baseline - entry.size * 0.3);
-        context.stroke();
-      }
-      x += entry.width;
-    }
-    y += line.height + lineGap;
-  }
-
-  const blob = await new Promise((resolve) =>
-    canvas.toBlob(resolve, "image/png"),
-  );
-  return blob
-    ? {
-        file: new File([blob], "clipboard-text.png", { type: "image/png" }),
-        naturalSize: { width: canvas.width, height: canvas.height },
-      }
-    : null;
-};
-
 export function useEditorController() {
   const { presentationId } = useParams();
   const navigate = useNavigate();
@@ -334,9 +240,17 @@ export function useEditorController() {
     }
   }, []);
 
-  const { state, eventBus, isLoading, saveStatus } = useEditorState(presentationId, {
-    onSaveError: handleSaveError,
-  });
+  const {
+    state,
+    eventBus,
+    isLoading,
+    saveStatus: autosaveStatus,
+    presentationSource,
+    setPresentationSource,
+  } = useEditorState(presentationId, { onSaveError: handleSaveError });
+  const saveStatus = presentationSource.status === "committing"
+    ? "saving"
+    : autosaveStatus;
 
   useEffect(() => {
     if (saveStatus === "saved") quotaWarningShownRef.current = false;
@@ -385,6 +299,7 @@ export function useEditorController() {
     removeFont,
     addMedia,
     updateMedia,
+    renamePresentation,
     deleteTextElement,
     toggleSlideHidden,
     deleteMedia,
@@ -842,16 +757,28 @@ useEffect(() => {
     [presentation, updateMasterTheme],
   );
 
+  const themeColorTxnRef = useRef({ active: false, timer: null });
   const handleUpdateThemeColor = useCallback(
     (colorVariable, hexColor) => {
+      const txn = themeColorTxnRef.current;
+      if (!txn.active) {
+        txn.active = true;
+        beginHistory();
+      }
       eventBus.dispatch(
         createEditorEvent(EditorEventType.MASTER.UPDATE_THEME_COLOR, {
           colorVariable,
           hexColor,
         }),
       );
+      if (txn.timer) clearTimeout(txn.timer);
+      txn.timer = setTimeout(() => {
+        txn.active = false;
+        txn.timer = null;
+        commitHistory();
+      }, 500);
     },
-    [eventBus],
+    [eventBus, beginHistory, commitHistory],
   );
 
   const handleApplyBackgroundToAll = useCallback(
@@ -1241,49 +1168,23 @@ useEffect(() => {
 
     try {
       const payload = await readClipboardPayload();
-      if (payload.imageBlob) {
-        const file = new File(
-          [payload.imageBlob],
-          `clipboard-image.${payload.imageType.split("/")[1] ?? "png"}`,
-          { type: payload.imageType },
-        );
-        const [{ mediaId, key }, naturalSize] = await Promise.all([
-          storeMediaFile(file),
-          readImageDimensionsFromFile(file),
-        ]);
-        await placeImageAtTarget(mediaId, key, naturalSize);
-        return true;
-      }
-
-      const internalText = internalClipboard.find(
-        (element) => element["media-type"] === undefined,
+      if (!payload.imageBlob) return false;
+      const file = new File(
+        [payload.imageBlob],
+        `clipboard-image.${payload.imageType.split("/")[1] ?? "png"}`,
+        { type: payload.imageType },
       );
-      let clipboardParagraphs = payload.html
-        ? htmlToClipboardParagraphs(payload.html)
-        : [];
-      if (
-        clipboardParagraphs.length === 0 &&
-        internalText?.paragraphs?.length
-      )
-        clipboardParagraphs = structuredClone(internalText.paragraphs);
-      if (clipboardParagraphs.length === 0 && payload.text)
-        clipboardParagraphs = plainTextToClipboardParagraphs(
-          payload.text,
-          currentFormatting,
-        );
-      const rendered = await renderClipboardParagraphsToPngFile(
-        clipboardParagraphs,
-        currentFormatting,
-      );
-      if (!rendered) return false;
-      const { mediaId, key } = await storeMediaFile(rendered.file);
-      await placeImageAtTarget(mediaId, key, rendered.naturalSize);
+      const [{ mediaId, key }, naturalSize] = await Promise.all([
+        storeMediaFile(file),
+        readImageDimensionsFromFile(file),
+      ]);
+      await placeImageAtTarget(mediaId, key, naturalSize);
       return true;
     } catch (error) {
       console.warn("[EditorPage] Clipboard picture paste failed:", error);
       return false;
     }
-  }, [state.clipboard, pasteElement, addMedia, updateElement, beginHistory, commitHistory, presentation, selectedSlide, selectedTextEl, slideWidth, slideHeight, currentFormatting]);
+  }, [state.clipboard, pasteElement, addMedia, updateElement, beginHistory, commitHistory, presentation, selectedSlide, selectedTextEl, slideWidth, slideHeight]);
 
   const handlePlaceholderImageUpload = useCallback(
     async (placeholderElement, file) => {
@@ -1471,36 +1372,65 @@ useEffect(() => {
     [selectedElementId, updateRunLink],
   );
 
-  const [linkedFolderPath, setLinkedFolderPath] = useState(null);
-  const linkedFolderPathRef = useRef(null);
+  const linkedFolderPath = presentationSource.projectFolder;
+  const linkedFolderPathRef = useRef(linkedFolderPath);
   useEffect(() => {
-    linkedFolderPathRef.current = linkedFolderPath;
-  }, [linkedFolderPath]);
-
-  const saveStatusRef = useRef(saveStatus);
-  useEffect(() => {
-    saveStatusRef.current = saveStatus;
-  }, [saveStatus]);
+    linkedFolderPathRef.current = presentationSource.projectFolder;
+  }, [presentationSource.projectFolder]);
 
   const canUseProjectFolders = isElectron() || supportsFileSystemAccess();
 
-  useEffect(() => {
-    if (!presentationId) return;
-    if (isElectron()) {
-      getElectronAPI()
-        .getLinkedFolder(presentationId)
-        .then(setLinkedFolderPath)
-        .catch(() => setLinkedFolderPath(null));
-    } else if (supportsFileSystemAccess()) {
-      getBrowserLinkedFolderName(presentationId)
-        .then(setLinkedFolderPath)
-        .catch(() => setLinkedFolderPath(null));
-    }
-  }, [presentationId]);
-
   const saveProjectToFolder = useCallback(
-    async (forceNewFolder) => {
-      const { jsonText, mediaFiles } = await buildProjectManifest(presentation);
+    async (forceNewFolder, renameTo = null) => {
+      const previousSource = presentationSource;
+      let targetFolder = previousSource.projectFolder;
+      let effectiveRename = renameTo;
+
+      if (isElectron()) {
+        if (forceNewFolder || previousSource.kind === "draft" || !targetFolder) {
+          const chosen = await chooseElectronProjectFolder(
+            renameTo || getPresentationTitle(presentation),
+          );
+          if (!chosen) return false;
+          targetFolder = chosen.projectFolder;
+          effectiveRename = chosen.folderName;
+        }
+
+        const effectivePresentation = effectiveRename
+          ? {
+              ...presentation,
+              slideset: { ...presentation.slideset, title: effectiveRename },
+            }
+          : presentation;
+
+        setPresentationSource(createCommittingSource(presentationId, targetFolder));
+        try {
+          const committedSource = await writeAndCommitElectronProjectSnapshot({
+            presentationId,
+            presentation: effectivePresentation,
+            projectFolder: targetFolder,
+          });
+          setPresentationSource(createProjectSource(
+            presentationId,
+            committedSource.projectFolder,
+          ));
+          if (effectiveRename) renamePresentation(effectiveRename);
+          if (previousSource.kind === "draft") {
+            deleteDraftManifest(presentationId).catch((error) => {
+              console.warn("[EditorPage] Could not remove committed draft manifest:", error);
+            });
+          }
+          return true;
+        } catch (error) {
+          setPresentationSource(previousSource);
+          throw error;
+        }
+      }
+
+      const effectivePresentation = renameTo
+        ? { ...presentation, slideset: { ...presentation.slideset, title: renameTo } }
+        : presentation;
+      const { jsonText, mediaFiles } = await buildProjectManifest(effectivePresentation);
       const mediaFileEntries = await Promise.all(
         mediaFiles.map(async (file) => ({
           relativePath: file.relativePath,
@@ -1512,55 +1442,228 @@ useEffect(() => {
         { relativePath: "presentation.json", kind: "text", text: jsonText },
         ...mediaFileEntries,
       ];
-      const presentationTitle = getPresentationTitle(presentation);
+      const presentationTitle = getPresentationTitle(effectivePresentation);
 
-      const savedFolder = isElectron()
-        ? await getElectronAPI().saveProject({ presentationId, presentationTitle, forceNewFolder, files })
-        : await saveProjectToBrowserFolder({ presentationId, presentationTitle, forceNewFolder, files });
+      const savedFolder = await saveProjectToBrowserFolder({
+        presentationId,
+        presentationTitle,
+        forceNewFolder,
+        files,
+      });
 
-      if (savedFolder) setLinkedFolderPath(savedFolder);
+      if (savedFolder && renameTo) renamePresentation(renameTo);
+      if (savedFolder) {
+        setPresentationSource(createProjectSource(presentationId, savedFolder));
+      }
       return Boolean(savedFolder);
+    },
+    [
+      presentation,
+      presentationId,
+      presentationSource,
+      renamePresentation,
+      setPresentationSource,
+    ],
+  );
+
+  const promptForPresentationName = useCallback(() => {
+    const current = getPresentationTitle(presentation);
+    const name = window.prompt("Presentation name:", current);
+    if (name === null) return null;
+    const trimmed = name.trim();
+    return trimmed || current;
+  }, [presentation]);
+
+  const handleSave = useCallback(async () => {
+    const sourceBeforeSave = presentationSource;
+    const result = await savePresentation();
+    if (!result.success || !canUseProjectFolders) return;
+    if (isElectron()) {
+      if (sourceBeforeSave.kind === "project") return;
+      try {
+        await saveProjectToFolder(false);
+      } catch (e) {
+        console.error("[EditorPage] Failed to save presentation folder:", e);
+        getElectronAPI().showError(
+          "Save Failed",
+          e?.message ?? "Could not save the presentation folder.",
+        );
+      }
+      return;
+    }
+    const isFirstSave = !linkedFolderPathRef.current;
+    const renameTo = isFirstSave ? promptForPresentationName() : null;
+    if (isFirstSave && renameTo === null) return;
+    try {
+      await saveProjectToFolder(false, renameTo);
+    } catch (e) {
+      console.error("[EditorPage] Failed to save presentation folder:", e);
+      const message = e?.message ?? "Could not save the presentation folder.";
+      if (isElectron()) getElectronAPI().showError("Save Failed", message);
+      else window.alert(message);
+    }
+  }, [
+    presentationSource,
+    savePresentation,
+    saveProjectToFolder,
+    canUseProjectFolders,
+    promptForPresentationName,
+  ]);
+
+  const handleSaveAs = useCallback(async () => {
+    if (isElectron()) {
+      const result = await savePresentation();
+      if (!result.success) return;
+      try {
+        await saveProjectToFolder(true);
+      } catch (e) {
+        console.error("[EditorPage] Failed to save presentation folder:", e);
+        getElectronAPI().showError(
+          "Save As Failed",
+          e?.message ?? "Could not save the presentation folder.",
+        );
+      }
+      return;
+    }
+    if (!canUseProjectFolders) {
+      const renameTo = promptForPresentationName();
+      if (renameTo === null) return;
+      downloadPresentationAsJson(
+        renameTo
+          ? { ...presentation, slideset: { ...presentation.slideset, title: renameTo, filename: renameTo } }
+          : presentation,
+      );
+      if (renameTo) renamePresentation(renameTo);
+      return;
+    }
+    const renameTo = promptForPresentationName();
+    if (renameTo === null) return;
+    try {
+      await saveProjectToFolder(true, renameTo);
+    } catch (e) {
+      console.error("[EditorPage] Failed to save presentation folder:", e);
+      const message = e?.message ?? "Could not save the presentation folder.";
+      if (isElectron()) getElectronAPI().showError("Save Failed", message);
+      else window.alert(message);
+    }
+  }, [
+    presentation,
+    savePresentation,
+    saveProjectToFolder,
+    canUseProjectFolders,
+    promptForPresentationName,
+    renamePresentation,
+  ]);
+
+  const requestCloseChoice = useCallback(async (source) => {
+    const folderName = source.projectFolder
+      ?.split(/[/\\]/)
+      .filter(Boolean)
+      .pop();
+    if (isElectron()) {
+      return getElectronAPI().confirmSaveBeforeQuit(folderName);
+    }
+    if (window.confirm("Save changes before closing?")) return "save";
+    return window.confirm("Close without saving changes?") ? "discard" : "cancel";
+  }, []);
+
+  const cleanupClosedPresentation = useCallback(
+    async () => {
+      await deletePresentation(presentationId, {
+        presentation,
+        deleteMedia: true,
+      });
     },
     [presentation, presentationId],
   );
 
-  const handleSave = useCallback(async () => {
-    const result = await savePresentation();
-    if (!result.success || !canUseProjectFolders) return;
-    try {
-      await saveProjectToFolder(false);
-    } catch (e) {
-      console.error("[EditorPage] Failed to save presentation folder:", e);
-      const message = e?.message ?? "Could not save the presentation folder.";
-      if (isElectron()) getElectronAPI().showError("Save Failed", message);
-      else window.alert(message);
-    }
-  }, [savePresentation, saveProjectToFolder, canUseProjectFolders]);
+  const prepareToLeave = useCallback(async () => {
+    const sourceBeforeClose = presentationSource;
+    const hadPendingChanges =
+      autosaveStatus === "pending" || autosaveStatus === "error";
 
-  const handleSaveAs = useCallback(async () => {
-    if (!canUseProjectFolders) {
-      downloadPresentationAsJson(presentation);
-      return;
-    }
     try {
-      await saveProjectToFolder(true);
-    } catch (e) {
-      console.error("[EditorPage] Failed to save presentation folder:", e);
-      const message = e?.message ?? "Could not save the presentation folder.";
-      if (isElectron()) getElectronAPI().showError("Save Failed", message);
-      else window.alert(message);
+      await eventBus.discardPending();
+
+      const needsChoice =
+        sourceBeforeClose.kind === "draft" || hadPendingChanges;
+      const choice = needsChoice
+        ? await requestCloseChoice(sourceBeforeClose)
+        : null;
+
+      if (choice === "cancel") {
+        if (hadPendingChanges && state.autosaveEnabled) {
+          eventBus.resumePending();
+        }
+        return false;
+      }
+
+      if (choice === "save") {
+        const cacheOrProjectSave = await savePresentation({ silent: true });
+        if (!cacheOrProjectSave.success) return false;
+
+        if (sourceBeforeClose.kind === "draft") {
+          const saved = await saveProjectToFolder(false);
+          if (!saved) return false;
+        }
+      }
+
+      await cleanupClosedPresentation();
+      return true;
+    } catch (error) {
+      console.error("[EditorPage] Could not close presentation safely:", error);
+      const message = error?.message ?? "The presentation could not be closed safely.";
+      if (isElectron()) {
+        await getElectronAPI().showError("Close Failed", message);
+      } else {
+        window.alert(message);
+      }
+      return false;
     }
-  }, [presentation, saveProjectToFolder, canUseProjectFolders]);
+  }, [
+    autosaveStatus,
+    cleanupClosedPresentation,
+    eventBus,
+    presentationSource,
+    requestCloseChoice,
+    savePresentation,
+    saveProjectToFolder,
+    state.autosaveEnabled,
+  ]);
+
+  const handleClosePresentation = useCallback(async () => {
+    if (await prepareToLeave()) navigate("/");
+  }, [navigate, prepareToLeave]);
 
   const handleNew = useCallback(async () => {
+    if (!(await prepareToLeave())) return;
     const id = await createPresentation(getPresentationTitle(null));
     navigate(`/editor/${id}`);
-  }, [navigate]);
+  }, [navigate, prepareToLeave]);
+
+  const handleOpenRecentProject = useCallback(
+    async (key) => {
+      if (!(await prepareToLeave())) return false;
+      const id = await openRecentProject(key);
+      navigate(`/editor/${id}`);
+      return true;
+    },
+    [navigate, prepareToLeave],
+  );
 
   const handleLoadFile = useCallback(
-    async (jsonText) => {
+    async (jsonText, readMediaFile = null) => {
       try {
-        const id = await importPresentationFromJson(jsonText);
+        const validation = deserializePresentation(jsonText);
+        if (!validation.data || validation.errors.length > 0) {
+          const details = validation.errors.slice(0, 5).join("\n");
+          throw new Error(`Invalid presentation file.${details ? `\n${details}` : ""}`);
+        }
+        if (!(await prepareToLeave())) return;
+        const finalJson = readMediaFile
+          ? await rehydrateProjectManifestJson(jsonText, readMediaFile)
+          : jsonText;
+        const id = await importPresentationFromJson(finalJson);
         navigate(`/editor/${id}`);
       } catch (e) {
         console.error("[EditorPage] Failed to import file:", e);
@@ -1572,21 +1675,30 @@ useEffect(() => {
         }
       }
     },
-    [navigate],
+    [navigate, prepareToLeave],
+  );
+
+  const openElectronProjectFromFolder = useCallback(
+    async (projectFolder) => {
+      if (!(await prepareToLeave())) return false;
+      const { presentationId: id } = await openElectronProjectFolder(projectFolder);
+      navigate(`/editor/${id}`);
+      return true;
+    },
+    [navigate, prepareToLeave],
   );
 
   const handleElectronOpen = useCallback(async () => {
     const api = getElectronAPI();
     try {
-      const [filePath] = await api.openFile();
-      if (!filePath) return;
-      const content = await api.readFile(filePath);
-      await handleLoadFile(content);
+      const projectFolder = await chooseElectronProjectToOpen();
+      if (!projectFolder) return;
+      await openElectronProjectFromFolder(projectFolder);
     } catch (e) {
-      console.error("[EditorPage] Failed to read file:", e);
-      api.showError("Open Failed", e?.message ?? "Could not read this file.");
+      console.error("[EditorPage] Failed to open project:", e);
+      api.showError("Open Failed", e?.message ?? "Could not open this project.");
     }
-  }, [handleLoadFile]);
+  }, [openElectronProjectFromFolder]);
 
   useEffect(() => {
     if (!isElectron()) return;
@@ -1599,46 +1711,31 @@ useEffect(() => {
       api.onMenuSaveAs(handleSaveAs),
       api.onFileDrop(async (filePath) => {
         try {
-          const content = await api.readFile(filePath);
-          await handleLoadFile(content);
+          const folder = filePath.replace(/[/\\][^/\\]*$/, "");
+          await openElectronProjectFromFolder(folder);
         } catch (e) {
-          console.error("[EditorPage] Failed to read dropped file:", e);
-          api.showError("Open Failed", e?.message ?? "Could not read this file.");
+          console.error("[EditorPage] Failed to open dropped project:", e);
+          api.showError("Open Failed", e?.message ?? "Could not open this project.");
         }
       }),
       api.onBeforeQuit(async () => {
-        const hasUnsavedChanges = saveStatusRef.current === "pending" || saveStatusRef.current === "saving";
-        const folder = linkedFolderPathRef.current;
-
-        if (folder && hasUnsavedChanges) {
-          const folderName = folder.split(/[/\\]/).filter(Boolean).pop();
-          const choice = await api.confirmSaveBeforeQuit(folderName);
-          if (choice === "cancel") {
-            api.cancelQuit();
-            return;
-          }
-          if (choice === "save") {
-            const saved = await saveProjectToFolder(false).catch(() => false);
-            if (!saved) {
-              api.notifyQuitReady(false, "The presentation could not be saved.");
-              return;
-            }
-          }
-        }
-
-        const result = await savePresentation({ silent: true });
-        if (result.success) {
+        if (await prepareToLeave()) {
           api.notifyQuitReady(true);
         } else {
-          api.notifyQuitReady(
-            false,
-            result.error?.message ?? "The presentation could not be saved.",
-          );
+          api.cancelQuit();
         }
       }),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [handleNew, handleElectronOpen, savePresentation, handleSave, handleSaveAs, handleLoadFile, saveProjectToFolder]);
+  }, [
+    handleNew,
+    handleElectronOpen,
+    handleSave,
+    handleSaveAs,
+    handleLoadFile,
+    openElectronProjectFromFolder,
+    prepareToLeave,
+  ]);
 
   const handleDeleteAndGoHome = useCallback(async () => {
     if (!presentationId) return;
@@ -1959,7 +2056,8 @@ useEffect(() => {
 
   const handleChangeCase = useCallback(
     (mode) => {
-      if (!selectedTextEl) return;
+      const targetEl = isSlideMasterOpen ? masterSelectedTextEl : selectedTextEl;
+      if (!targetEl) return;
 
       const transform = (text) => {
         if (mode === "lower") return text.toLocaleLowerCase();
@@ -1990,15 +2088,17 @@ useEffect(() => {
         return text;
       };
 
-      const selection = activeSelectionRef.current;
+      const selection = isSlideMasterOpen
+        ? masterActiveSelection
+        : activeSelectionRef.current;
       const hasSelection =
-        selection?.elementId === selectedTextEl.id &&
+        selection?.elementId === targetEl.id &&
         !(
           selection.paragraphIdx ===
             (selection.endParagraphIdx ?? selection.paragraphIdx) &&
           selection.rangeStart === selection.rangeEnd
         );
-      const paragraphs = structuredClone(selectedTextEl.paragraphs ?? []);
+      const paragraphs = structuredClone(targetEl.paragraphs ?? []);
 
       paragraphs.forEach((paragraph, paragraphIndex) => {
         if (
@@ -2025,10 +2125,6 @@ useEffect(() => {
             ? selection.rangeEnd
             : paragraphLength;
 
-        // Transform the paragraph text as one string, then slice it back per
-        // run. Case transforms keep the length, and transforming run-by-run
-        // would make word/sentence detection restart at every formatting
-        // boundary (e.g. a bold span mid-word got its letter capitalized).
         const fullText = (paragraph.runs ?? []).map((run) => run.text ?? "").join("");
         const transformedText =
           fullText.slice(0, start) +
@@ -2044,13 +2140,21 @@ useEffect(() => {
         });
       });
 
-      updateTextElementParagraphs(
-        selectedSlideIndex,
-        selectedTextEl.id,
-        paragraphs,
-      );
+      if (isSlideMasterOpen) {
+        masterViewChangeParagraphs(targetEl.id, paragraphs);
+      } else {
+        updateTextElementParagraphs(
+          selectedSlideIndex,
+          targetEl.id,
+          paragraphs,
+        );
+      }
     },
     [
+      isSlideMasterOpen,
+      masterSelectedTextEl,
+      masterActiveSelection,
+      masterViewChangeParagraphs,
       selectedTextEl,
       selectedSlideIndex,
       updateTextElementParagraphs,
@@ -2137,9 +2241,6 @@ useEffect(() => {
   }, []);
 
   const handleOpenPreviewFromCurrent = useCallback(() => {
-    // The preview deck only contains visible slides, so the raw slide index
-    // must be mapped to the index within the visible ones. When the current
-    // slide itself is hidden this lands on the next visible slide.
     const allSlides = presentation?.slideset?.slides ?? [];
     const visibleBefore = allSlides
       .slice(0, selectedSlideIndex)
@@ -2211,6 +2312,7 @@ useEffect(() => {
     isLoading,
     saveStatus,
     linkedFolderPath,
+    presentationSource,
 
     state,
     presentation,
@@ -2311,7 +2413,10 @@ useEffect(() => {
     handleRemoveHyperlink,
     handleSave,
     handleSaveAs,
+    handleClosePresentation,
     handleNew,
+    handleOpenRecentProject,
+    handleElectronOpen,
     handleLoadFile,
     handleDeleteAndGoHome,
     handleFormatChange,

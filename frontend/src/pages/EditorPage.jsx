@@ -35,8 +35,11 @@ export default function EditorPage() {
       <FileMenu
         presentationTitle={ctrl.presentationTitle}
         onClose={() => ctrl.setActiveTab("Home")}
+        onClosePresentation={ctrl.handleClosePresentation}
         onGoHome={() => navigate("/")}
         onNew={ctrl.handleNew}
+        onOpen={ctrl.handleElectronOpen}
+        onOpenProject={ctrl.handleOpenRecentProject}
         onSave={ctrl.handleSave}
         onSaveAs={ctrl.handleSaveAs}
         onExport={ctrl.exportPresentation}
@@ -213,6 +216,9 @@ export default function EditorPage() {
             onBringForward={ctrl.handleMasterBringForward}
             onSendBackward={ctrl.handleMasterSendBackward}
             onSendToBack={ctrl.handleMasterSendToBack}
+            formatPainterClipboard={ctrl.state.formatPainterClipboard}
+            onFormatPainterCopy={ctrl.formatPainterCopy}
+            onFormatPainterPaste={ctrl.formatPainterPaste}
           />
         ) : ctrl.currentView === "slide-sorter" ? (
           <SlideSorterView

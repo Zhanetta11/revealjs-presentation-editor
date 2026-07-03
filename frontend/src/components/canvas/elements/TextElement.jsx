@@ -349,6 +349,13 @@ export default function TextElement({
         if (event.button === 2) captureContextSelection();
         if (
           event.button === 0 &&
+          editableRef.current &&
+          !editableRef.current.contains(event.target)
+        ) {
+          clearSavedSelection();
+        }
+        if (
+          event.button === 0 &&
           (!isSelected ||
             objectSelectionMode ||
             event.ctrlKey ||

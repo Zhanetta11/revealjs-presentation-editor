@@ -1,4 +1,4 @@
-import { storeMediaFile } from "./persistenceFacade";
+import { storeMediaFile, storeMediaFileAtKey } from "./mediaStorage";
 
 const isRelativeMediaPath = (value) =>
   typeof value === "string" && (value.startsWith("media/") || value.startsWith("fonts/"));
@@ -24,7 +24,11 @@ const mimeFromExtension = (relativePath) => {
   return MIME_TYPES_BY_EXTENSION[ext] ?? "application/octet-stream";
 };
 
-export async function rehydrateProjectMedia(presentation, readFile) {
+export async function rehydrateProjectMedia(
+  presentation,
+  readFile,
+  { cacheKeyForPath = null } = {},
+) {
   const cache = new Map();
 
   const resolveRef = (relativePath) => {
@@ -35,7 +39,12 @@ export async function rehydrateProjectMedia(presentation, readFile) {
           const bytes = await readFile(relativePath);
           if (!bytes) return null;
           const blob = new Blob([bytes], { type: mimeFromExtension(relativePath) });
-          const { key } = await storeMediaFile(blob);
+          const preferredKey = cacheKeyForPath
+            ? await cacheKeyForPath(relativePath)
+            : null;
+          const { key } = preferredKey
+            ? await storeMediaFileAtKey(preferredKey, blob)
+            : await storeMediaFile(blob);
           return `indexeddb://${key}`;
         })(),
       );
@@ -61,8 +70,8 @@ export async function rehydrateProjectMedia(presentation, readFile) {
   return walk(presentation);
 }
 
-export async function rehydrateProjectManifestJson(jsonText, readFile) {
+export async function rehydrateProjectManifestJson(jsonText, readFile, options) {
   const parsed = JSON.parse(jsonText);
-  const rehydrated = await rehydrateProjectMedia(parsed, readFile);
+  const rehydrated = await rehydrateProjectMedia(parsed, readFile, options);
   return JSON.stringify(rehydrated);
 }

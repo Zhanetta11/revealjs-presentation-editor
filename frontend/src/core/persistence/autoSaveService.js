@@ -128,7 +128,14 @@ const createDebounce = (fn, delay) => {
 
 export const createAutosaveService = (
   getState,
-  { storageKey = DEFAULT_STORAGE_KEY, delay = DEFAULT_AUTOSAVE_DELAY, onError, onStatusChange } = {},
+  {
+    storageKey = DEFAULT_STORAGE_KEY,
+    delay = DEFAULT_AUTOSAVE_DELAY,
+    onError,
+    onStatusChange,
+    getSource,
+    persistProject,
+  } = {},
 ) => {
   let saveQueue = Promise.resolve();
   const setStatus = (status) => onStatusChange?.(status);
@@ -144,14 +151,30 @@ export const createAutosaveService = (
       const title = state.presentation?.slideset?.title
         ?? state.presentation?.slideset?.filename
         ?? "Untitled Presentation";
-      const write = async () => {
+      const writeDraft = async () => {
         await storageAdapter.set(storageKey, serializePresentation(state.presentation));
         await updateIndexEntry(id, title);
       };
-      if (globalThis.navigator?.locks) {
-        await navigator.locks.request(`presentation-write:${storageKey}`, write);
+      const source = getSource?.() ?? {
+        kind: "draft",
+        presentationId: id,
+        projectFolder: null,
+        status: "draft",
+      };
+      if (source.kind === "project") {
+        if (typeof persistProject !== "function" || !source.projectFolder) {
+          throw new Error("No project-folder persistence sink is available.");
+        }
+        await persistProject({
+          presentationId: id,
+          presentation: state.presentation,
+          projectFolder: source.projectFolder,
+          source,
+        });
+      } else if (globalThis.navigator?.locks) {
+        await navigator.locks.request(`presentation-write:${storageKey}`, writeDraft);
       } else {
-        await write();
+        await writeDraft();
       }
       if (import.meta.env.DEV) {
         console.log("[AutosaveService] Saved.");
@@ -198,6 +221,17 @@ export const createAutosaveService = (
     await saveQueue;
   };
 
+  const discardPending = async () => {
+    scheduleAutosave.cancel();
+    scheduleTextAutosave.cancel();
+    await saveQueue;
+  };
+
+  const resumePending = () => {
+    setStatus("pending");
+    return scheduleAutosave();
+  };
+
   const dispose = () => {
     scheduleAutosave.cancel();
     scheduleTextAutosave.cancel();
@@ -209,6 +243,8 @@ export const createAutosaveService = (
     shouldAutosave,
     persistAutosaveSetting,
     flush,
+    discardPending,
+    resumePending,
     dispose,
   };
 };

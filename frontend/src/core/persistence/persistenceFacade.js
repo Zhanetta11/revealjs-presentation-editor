@@ -4,12 +4,24 @@ import {
   createPresentation,
   updateIndexEntry,
   deletePresentation,
+  deleteDraftManifest,
   loadPresentation,
   savePresentation,
   presentationKey,
 } from "./presentationsLibrary";
 import { storeMediaFile, getMediaFile } from "./mediaStorage";
 import { downloadPresentationAsJson } from "./serializationOperations";
+export {
+  PresentationSourceKind,
+  PresentationSourceStatus,
+  createDraftSource,
+  createProjectSource,
+  createCommittingSource,
+  normalizePresentationSource,
+  getPresentationSource,
+  getProjectPresentationSources,
+  releasePresentationSource,
+} from "./sourceMetadata";
 
 export const storageGet    = (key)        => storageAdapter.get(key);
 export const storageSet    = (key, value) => storageAdapter.set(key, value);
@@ -20,6 +32,7 @@ export {
   createPresentation,
   updateIndexEntry,
   deletePresentation,
+  deleteDraftManifest,
   loadPresentation,
   savePresentation,
   presentationKey,
@@ -28,6 +41,15 @@ export {
 export { storeMediaFile, getMediaFile };
 
 export { downloadPresentationAsJson };
+export {
+  chooseElectronProjectFolder,
+  chooseElectronProjectToOpen,
+  openElectronProjectFolder,
+  writeElectronProjectSnapshot,
+  loadElectronProjectSnapshot,
+  commitElectronProjectSource,
+  writeAndCommitElectronProjectSnapshot,
+} from "./electronProjectFolder";
 
 const localStorageSettings = {
   get(key) {

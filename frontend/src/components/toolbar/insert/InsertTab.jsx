@@ -98,8 +98,14 @@ export default function InsertTab({ onImageUpload, onVideoUpload, onAddSlide, on
         <button
           className="toolbar-item large"
           onClick={() => setShowHyperlinkDialog(true)}
-          title={isSlideMasterOpen ? "Hyperlinks are not available in Slide Master view" : "Insert Link"}
-          disabled={isSlideMasterOpen}
+          title={
+            isSlideMasterOpen
+              ? "Hyperlinks are not available in Slide Master view"
+              : !selectedHyperlinkText.trim()
+                ? "Select some text to add a link"
+                : "Insert Link"
+          }
+          disabled={isSlideMasterOpen || !selectedHyperlinkText.trim()}
         >
           <MdLink />
           <span>Link</span>

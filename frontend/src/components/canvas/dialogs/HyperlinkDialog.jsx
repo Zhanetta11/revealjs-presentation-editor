@@ -5,7 +5,6 @@ import {
   MdWeb,
 } from "react-icons/md";
 import EmailLinkPanel from "./hyperlink/EmailLinkPanel";
-import NewDocumentPanel from "./hyperlink/NewDocumentPanel";
 import PlaceLinkPanel from "./hyperlink/PlaceLinkPanel";
 import WebLinkPanel from "./hyperlink/WebLinkPanel";
 import { normalizeHyperlinkHref } from "../../../core/utils/hyperlinkUtils";
@@ -15,7 +14,6 @@ import "./dialogs.css";
 const LINK_TYPES = [
   { value: "web", label: "Existing File or Web Page", icon: <MdWeb /> },
   { value: "place", label: "Place in This Document", icon: <MdDescription /> },
-  { value: "new", label: "Create New Document", icon: <MdDescription /> },
   { value: "email", label: "E-mail Address", icon: <MdMailOutline /> },
 ];
 
@@ -35,8 +33,6 @@ export default function HyperlinkDialog({
   const [webFolder, setWebFolder] = useState("Current Folder");
   const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);
   const [showAndReturn, setShowAndReturn] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState("");
-  const [editNewDocumentNow, setEditNewDocumentNow] = useState(true);
   const [emailAddress, setEmailAddress] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [activeBrowseButton, setActiveBrowseButton] = useState("");
@@ -100,15 +96,12 @@ export default function HyperlinkDialog({
     const value =
       linkType === "place"
         ? `#slide-${selectedSlideIndex + 1}`
-        : linkType === "new"
-          ? newDocumentName.trim()
-          : linkType === "email"
-            ? emailAddress.trim()
-            : href.trim();
+        : linkType === "email"
+          ? emailAddress.trim()
+          : href.trim();
     if (!value) {
       const messages = {
         place: "Select a place in this document.",
-        new: "Enter a new document name.",
         email: "Enter an e-mail address.",
         web: "Enter a link address.",
       };
@@ -127,7 +120,6 @@ export default function HyperlinkDialog({
       screenTip: screenTip.trim(),
       type: linkType,
       showAndReturn,
-      editNewDocumentNow,
     });
     if (ok === false) {
       setError("Select text in one paragraph before adding a hyperlink.");
@@ -212,17 +204,6 @@ export default function HyperlinkDialog({
                   changeHref(`#slide-${index + 1}`);
                 }}
                 onShowAndReturnChange={setShowAndReturn}
-              />
-            )}
-            {linkType === "new" && (
-              <NewDocumentPanel
-                documentName={newDocumentName}
-                editNow={editNewDocumentNow}
-                onDocumentNameChange={(value) => {
-                  setNewDocumentName(value);
-                  changeHref(value);
-                }}
-                onEditNowChange={setEditNewDocumentNow}
               />
             )}
             {linkType === "email" && (

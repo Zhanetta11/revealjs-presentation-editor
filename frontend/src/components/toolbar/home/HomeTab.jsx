@@ -15,6 +15,7 @@ export default function HomeTab({
   canDelete,
   onToggleSlideHidden,
   isSlideHidden,
+  isSlideMasterOpen = false,
   currentFormatting = {},
   onFormatChange,
   onChangeCase,
@@ -63,6 +64,7 @@ export default function HomeTab({
         canDelete={canDelete}
         onToggleSlideHidden={onToggleSlideHidden}
         isSlideHidden={isSlideHidden}
+        isSlideMasterOpen={isSlideMasterOpen}
         presentation={presentation}
       />
 

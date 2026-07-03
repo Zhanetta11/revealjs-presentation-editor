@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: (defaultName, extension) => ipcRenderer.invoke('dialog:saveFile', defaultName, extension),
   readFile: (filePath) => ipcRenderer.invoke('file:readFile', filePath),
+  readMediaSibling: (folder, relativePath) => ipcRenderer.invoke('file:readMediaSibling', folder, relativePath),
   writeFile: (filePath, content) => ipcRenderer.invoke('file:writeFile', filePath, content),
 
   saveProject: (payload) => ipcRenderer.invoke('project:save', payload),
@@ -15,6 +16,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   linkPresentation: (presentationId, projectFolder) => ipcRenderer.invoke('project:linkPresentation', presentationId, projectFolder),
   getLinkedFolder: (presentationId) => ipcRenderer.invoke('project:getLinkedFolder', presentationId),
   getLinkedPresentationIds: () => ipcRenderer.invoke('project:getLinkedIds'),
+  getPresentationSource: (presentationId) => ipcRenderer.invoke('project:getSource', presentationId),
+  getPresentationSources: () => ipcRenderer.invoke('project:getSources'),
+  releasePresentationSource: (presentationId) =>
+    ipcRenderer.invoke('project:releaseSource', presentationId),
+  chooseProjectFolder: (presentationTitle) => ipcRenderer.invoke('project:chooseFolder', presentationTitle),
+  chooseProjectToOpen: () => ipcRenderer.invoke('project:chooseOpenFolder'),
+  openProjectFolder: (projectFolder) => ipcRenderer.invoke('project:openFolder', projectFolder),
+  writeProjectSnapshot: (payload) => ipcRenderer.invoke('project:writeSnapshot', payload),
+  loadProjectSnapshot: (projectFolder) => ipcRenderer.invoke('project:loadSnapshot', projectFolder),
+  readProjectSnapshotFile: (projectFolder, relativePath) =>
+    ipcRenderer.invoke('project:readSnapshotFile', projectFolder, relativePath),
+  commitProjectSource: (presentationId, projectFolder) =>
+    ipcRenderer.invoke('project:commitSource', presentationId, projectFolder),
 
   pickLinkTarget: () => ipcRenderer.invoke('dialog:pickLinkTarget'),
   openLocalFile: (fileUrl) => ipcRenderer.invoke('shell:openLocalFile', fileUrl),

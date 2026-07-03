@@ -380,6 +380,14 @@ export function useEditorActions(
     [eventBus],
   );
 
+  const renamePresentation = useCallback(
+    (title) =>
+      eventBus.dispatch(
+        createEditorEvent(EditorEventType.PRESENTATION.RENAME, { title }),
+      ),
+    [eventBus],
+  );
+
   const deleteMedia = useCallback(
     (mediaId) =>
       eventBus.dispatch(
@@ -790,6 +798,7 @@ export function useEditorActions(
     removeFont,
     addMedia,
     updateMedia,
+    renamePresentation,
     deleteMedia,
     addAnimation,
     addAnimationForElement,

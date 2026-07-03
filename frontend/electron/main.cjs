@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('electron');
 const path = require('path');
 const { pathToFileURL, fileURLToPath } = require('url');
+const { randomUUID } = require('crypto');
 const isDev = require('electron-is-dev');
 const fs = require('fs');
 const logger = require('./logger.cjs');
@@ -14,11 +15,61 @@ const linkedProjectFolders = new Map();
 const projectSaveQueues = new Map();
 const allowedReadPaths = new Set();
 const allowedWritePaths = new Set();
+const allowedProjectWriteFolders = new Set();
+const allowedProjectReadFolders = new Set();
 
 const userDataPath = app.getPath('userData');
 const normalizeFilePath = (filePath) => path.resolve(String(filePath ?? ''));
 const isTrustedSender = (event) =>
   Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents);
+
+function readPersistedProjectFolders() {
+  const stored = config.get('projectFoldersByPresentationId', {});
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+  return Object.fromEntries(
+    Object.entries(stored)
+      .filter(([presentationId, projectFolder]) =>
+        typeof presentationId === 'string'
+        && presentationId.length > 0
+        && typeof projectFolder === 'string'
+        && projectFolder.length > 0)
+      .map(([presentationId, projectFolder]) => [
+        presentationId,
+        normalizeFilePath(projectFolder),
+      ]),
+  );
+}
+
+function restoreLinkedProjectFolders() {
+  linkedProjectFolders.clear();
+  Object.entries(readPersistedProjectFolders()).forEach(([presentationId, projectFolder]) => {
+    linkedProjectFolders.set(presentationId, projectFolder);
+  });
+}
+
+function persistLinkedProjectFolder(presentationId, projectFolder) {
+  const normalizedFolder = normalizeFilePath(projectFolder);
+  const mappings = readPersistedProjectFolders();
+  mappings[presentationId] = normalizedFolder;
+  config.set('projectFoldersByPresentationId', mappings);
+  linkedProjectFolders.set(presentationId, normalizedFolder);
+  return normalizedFolder;
+}
+
+function getPresentationSourceDescriptor(presentationId) {
+  const projectFolder = linkedProjectFolders.get(presentationId)
+    || readPersistedProjectFolders()[presentationId]
+    || null;
+  return projectFolder
+    ? { kind: 'project', presentationId, projectFolder, status: 'project' }
+    : { kind: 'draft', presentationId, projectFolder: null, status: 'draft' };
+}
+
+function findPresentationIdForProjectFolder(projectFolder) {
+  const normalizedFolder = normalizeFilePath(projectFolder);
+  return Object.entries(readPersistedProjectFolders())
+    .find(([, folder]) => normalizeFilePath(folder) === normalizedFolder)?.[0] ?? null;
+}
 
 function requireTrustedSender(event) {
   if (!isTrustedSender(event)) throw new Error('Untrusted IPC sender.');
@@ -64,10 +115,12 @@ function createWindow() {
   logger.info('Creating main window');
   readyToClose = false;
   flushInProgress = false;
-  linkedProjectFolders.clear();
+  restoreLinkedProjectFolders();
   ipcMain.removeAllListeners('app:quitReady');
   allowedReadPaths.clear();
   allowedWritePaths.clear();
+  allowedProjectWriteFolders.clear();
+  allowedProjectReadFolders.clear();
   const windowState = loadWindowState();
 
   mainWindow = new BrowserWindow({
@@ -154,7 +207,7 @@ function createWindow() {
         readyToClose = true;
         mainWindow.close();
       }
-    }, 3000);
+    }, 5 * 60 * 1000);
 
     ipcMain.once('app:quitReady', async (ipcEvent, result = {}) => {
       if (!isTrustedSender(ipcEvent)) return;
@@ -196,6 +249,7 @@ function createWindow() {
       const filePath = files[0];
       if (filePath.endsWith('.json')) {
         allowedReadPaths.add(normalizeFilePath(filePath));
+        allowedProjectReadFolders.add(normalizeFilePath(path.dirname(filePath)));
         mainWindow.webContents.send('file:dropped', filePath);
       } else {
         dialog.showErrorBox('Invalid file', 'Please drop a .json presentation file');
@@ -271,7 +325,10 @@ ipcMain.handle('dialog:openFile', async (event) => {
     ],
   });
   if (result.filePaths.length > 0) {
-    result.filePaths.forEach((filePath) => allowedReadPaths.add(normalizeFilePath(filePath)));
+    result.filePaths.forEach((filePath) => {
+      allowedReadPaths.add(normalizeFilePath(filePath));
+      allowedProjectReadFolders.add(normalizeFilePath(path.dirname(filePath)));
+    });
     logger.info('File opened', { path: result.filePaths[0] });
   }
   return result.filePaths;
@@ -453,6 +510,366 @@ async function chooseNewProjectFolder(presentationTitle) {
   return projectFolder;
 }
 
+async function chooseNamedProjectFolder(presentationTitle) {
+  const defaultFolderName = sanitizeFolderName(presentationTitle);
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Choose project folder name and location',
+    defaultPath: defaultFolderName,
+    buttonLabel: 'Select Project Folder',
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  });
+  if (result.canceled || !result.filePath) return null;
+
+  const projectFolder = normalizeFilePath(result.filePath);
+  const stats = await fs.promises.stat(projectFolder).catch(() => null);
+  if (stats?.isFile()) {
+    throw new Error('The selected project path is an existing file.');
+  }
+  if (stats?.isDirectory()) {
+    const entries = await fs.promises.readdir(projectFolder);
+    if (entries.length > 0) {
+      throw new Error('Please choose a new or empty project folder.');
+    }
+  }
+  return {
+    projectFolder,
+    folderName: path.basename(projectFolder),
+  };
+}
+
+function validateProjectRelativePath(relativePath) {
+  if (
+    typeof relativePath !== 'string'
+    || !relativePath
+    || relativePath.includes('..')
+    || path.isAbsolute(relativePath)
+  ) {
+    throw new Error(`Invalid project file path: ${relativePath}`);
+  }
+  const normalized = relativePath.replaceAll('\\', '/');
+  if (
+    normalized !== 'presentation.json'
+    && !normalized.startsWith('media/image/')
+    && !normalized.startsWith('media/video/')
+    && !normalized.startsWith('fonts/')
+  ) {
+    throw new Error(`Unsupported project file path: ${relativePath}`);
+  }
+  return normalized;
+}
+
+function isWritableProjectFolder(projectFolder) {
+  const normalized = normalizeFilePath(projectFolder);
+  const persistedFolders = Object.values(readPersistedProjectFolders());
+  return allowedProjectWriteFolders.has(normalized)
+    || persistedFolders.includes(normalized);
+}
+
+function isReadableProjectFolder(projectFolder) {
+  const normalized = normalizeFilePath(projectFolder);
+  const recentFolders = config.get('recentProjects', []).map(normalizeFilePath);
+  return isWritableProjectFolder(normalized)
+    || allowedProjectReadFolders.has(normalized)
+    || recentFolders.includes(normalized);
+}
+
+function requireProjectFolder(projectFolder, access) {
+  const normalized = normalizeFilePath(projectFolder);
+  const allowed = access === 'write'
+    ? isWritableProjectFolder(normalized)
+    : isReadableProjectFolder(normalized);
+  if (!allowed) {
+    throw new Error('This project folder was not authorized by the user.');
+  }
+  return normalized;
+}
+
+async function writeProjectFile(root, file) {
+  const relativePath = validateProjectRelativePath(file.relativePath);
+  const resolved = path.resolve(root, relativePath);
+  if (!resolved.startsWith(root + path.sep)) {
+    throw new Error(`Invalid project file path: ${file.relativePath}`);
+  }
+  await fs.promises.mkdir(path.dirname(resolved), { recursive: true });
+  if (file.kind === 'binary') {
+    if (!ArrayBuffer.isView(file.bytes)) {
+      throw new Error(`Invalid binary project file: ${file.relativePath}`);
+    }
+    await fs.promises.writeFile(resolved, Buffer.from(file.bytes));
+    return;
+  }
+  if (file.kind !== 'text' || typeof file.text !== 'string') {
+    throw new Error(`Invalid text project file: ${file.relativePath}`);
+  }
+  await fs.promises.writeFile(resolved, file.text, 'utf-8');
+}
+
+function collectProjectAssetReferences(value, references = new Set()) {
+  if (Array.isArray(value)) {
+    value.forEach((child) => collectProjectAssetReferences(child, references));
+    return references;
+  }
+  if (!value || typeof value !== 'object') return references;
+  Object.entries(value).forEach(([key, child]) => {
+    if (
+      (key === 'file-link' || key === 'font-file')
+      && typeof child === 'string'
+      && (child.startsWith('media/') || child.startsWith('fonts/'))
+    ) {
+      references.add(validateProjectRelativePath(child));
+    } else {
+      collectProjectAssetReferences(child, references);
+    }
+  });
+  return references;
+}
+
+async function verifyStagedProject(stagingFolder) {
+  const manifestPath = path.join(stagingFolder, 'presentation.json');
+  const manifestText = await fs.promises.readFile(manifestPath, 'utf-8');
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch {
+    throw new Error('The staged presentation.json is not valid JSON.');
+  }
+  const references = collectProjectAssetReferences(manifest);
+  for (const relativePath of references) {
+    const assetPath = path.resolve(stagingFolder, relativePath);
+    const stats = await fs.promises.stat(assetPath).catch(() => null);
+    if (!stats?.isFile()) {
+      throw new Error(`Required project asset was not staged: ${relativePath}`);
+    }
+  }
+}
+
+async function stageProjectSnapshot(projectFolder, files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error('Project snapshot contains no files.');
+  }
+  const manifests = files.filter((file) => file.relativePath === 'presentation.json');
+  if (manifests.length !== 1) {
+    throw new Error('Project snapshot must contain exactly one presentation.json.');
+  }
+  const duplicatePaths = new Set();
+  const seenPaths = new Set();
+  files.forEach((file) => {
+    const relativePath = validateProjectRelativePath(file.relativePath);
+    if (seenPaths.has(relativePath)) duplicatePaths.add(relativePath);
+    seenPaths.add(relativePath);
+  });
+  if (duplicatePaths.size > 0) {
+    throw new Error(`Duplicate project file path: ${[...duplicatePaths][0]}`);
+  }
+
+  const target = path.resolve(projectFolder);
+  const parent = path.dirname(target);
+  const baseName = path.basename(target);
+  const stagingFolder = path.join(parent, `.${baseName}.staging-${randomUUID()}`);
+  await fs.promises.mkdir(parent, { recursive: true });
+
+  try {
+    const targetStats = await fs.promises.stat(target).catch(() => null);
+    if (targetStats?.isDirectory()) {
+      await fs.promises.cp(target, stagingFolder, { recursive: true, errorOnExist: true });
+    } else {
+      await fs.promises.mkdir(stagingFolder, { recursive: true });
+    }
+    await fs.promises.mkdir(path.join(stagingFolder, 'media', 'image'), { recursive: true });
+    await fs.promises.mkdir(path.join(stagingFolder, 'media', 'video'), { recursive: true });
+    await fs.promises.mkdir(path.join(stagingFolder, 'fonts'), { recursive: true });
+
+    const manifest = manifests[0];
+    for (const file of files) {
+      if (file !== manifest) await writeProjectFile(stagingFolder, file);
+    }
+    await writeProjectFile(stagingFolder, manifest);
+    await verifyStagedProject(stagingFolder);
+    return stagingFolder;
+  } catch (error) {
+    await fs.promises.rm(stagingFolder, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+async function commitStagedProject(projectFolder, stagingFolder) {
+  const target = path.resolve(projectFolder);
+  const parent = path.dirname(target);
+  if (path.dirname(path.resolve(stagingFolder)) !== parent) {
+    throw new Error('Project staging folder must be beside its destination.');
+  }
+  const backupFolder = path.join(parent, `.${path.basename(target)}.backup-${randomUUID()}`);
+  const targetExists = Boolean(await fs.promises.stat(target).catch(() => null));
+  let backupCreated = false;
+
+  try {
+    if (targetExists) {
+      await fs.promises.rename(target, backupFolder);
+      backupCreated = true;
+    }
+    await fs.promises.rename(stagingFolder, target);
+  } catch (error) {
+    if (backupCreated) {
+      const targetAfterFailure = await fs.promises.stat(target).catch(() => null);
+      if (!targetAfterFailure) {
+        await fs.promises.rename(backupFolder, target).catch(() => {});
+      }
+    }
+    throw error;
+  }
+
+  if (backupCreated) {
+    fs.promises.rm(backupFolder, { recursive: true, force: true }).catch((error) => {
+      logger.warn('Could not remove project backup folder', {
+        folder: backupFolder,
+        error: error.message,
+      });
+    });
+  }
+}
+
+async function writeSafeProjectSnapshot(projectFolder, files) {
+  const stagingFolder = await stageProjectSnapshot(projectFolder, files);
+  try {
+    await commitStagedProject(projectFolder, stagingFolder);
+  } catch (error) {
+    await fs.promises.rm(stagingFolder, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+ipcMain.handle('project:chooseFolder', async (event, presentationTitle) => {
+  requireTrustedSender(event);
+  const chosen = await chooseNamedProjectFolder(presentationTitle);
+  if (!chosen) return null;
+  const normalized = normalizeFilePath(chosen.projectFolder);
+  allowedProjectWriteFolders.add(normalized);
+  return {
+    projectFolder: normalized,
+    folderName: chosen.folderName,
+  };
+});
+
+ipcMain.handle('project:writeSnapshot', async (event, {
+  presentationId,
+  projectFolder,
+  files,
+} = {}) => {
+  requireTrustedSender(event);
+  if (!presentationId) throw new Error('Missing presentation id.');
+  const target = requireProjectFolder(projectFolder, 'write');
+  return queueProjectSave(presentationId, async () => {
+    try {
+      await writeSafeProjectSnapshot(target, files);
+      allowedProjectWriteFolders.delete(target);
+      allowedProjectReadFolders.add(target);
+      return { projectFolder: target, verified: true };
+    } catch (error) {
+      allowedProjectWriteFolders.delete(target);
+      logger.error('Failed to write safe project snapshot', {
+        folder: target,
+        error: error.message,
+      });
+      throw new Error(`Failed to write project snapshot: ${error.message}`);
+    }
+  });
+});
+
+ipcMain.handle('project:loadSnapshot', async (event, projectFolder) => {
+  requireTrustedSender(event);
+  const folder = requireProjectFolder(projectFolder, 'read');
+  const manifestPath = path.join(folder, 'presentation.json');
+  const [text, stats] = await Promise.all([
+    fs.promises.readFile(manifestPath, 'utf-8'),
+    fs.promises.stat(manifestPath),
+  ]);
+  JSON.parse(text);
+  return { text, updatedAt: stats.mtimeMs, projectFolder: folder };
+});
+
+ipcMain.handle('project:chooseOpenFolder', async (event) => {
+  requireTrustedSender(event);
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Open Presentation Project',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Presentation Project', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const selectedFile = normalizeFilePath(result.filePaths[0]);
+  if (path.basename(selectedFile).toLowerCase() !== 'presentation.json') {
+    throw new Error('Select the presentation.json file inside the project folder.');
+  }
+  const projectFolder = normalizeFilePath(path.dirname(selectedFile));
+  allowedProjectReadFolders.add(projectFolder);
+  return projectFolder;
+});
+
+ipcMain.handle('project:openFolder', async (event, projectFolder) => {
+  requireTrustedSender(event);
+  const folder = requireProjectFolder(projectFolder, 'read');
+  await verifyStagedProject(folder);
+
+  let presentationId = findPresentationIdForProjectFolder(folder);
+  if (!presentationId) {
+    presentationId = randomUUID();
+    persistLinkedProjectFolder(presentationId, folder);
+  } else {
+    linkedProjectFolders.set(presentationId, folder);
+  }
+  recordRecentProject(folder);
+  return { presentationId, projectFolder: folder };
+});
+
+ipcMain.handle('project:readSnapshotFile', async (event, projectFolder, relativePath) => {
+  requireTrustedSender(event);
+  const folder = requireProjectFolder(projectFolder, 'read');
+  const safeRelativePath = validateProjectRelativePath(relativePath);
+  if (safeRelativePath === 'presentation.json') {
+    throw new Error('Use project:loadSnapshot to read presentation.json.');
+  }
+  const resolved = path.resolve(folder, safeRelativePath);
+  if (!resolved.startsWith(folder + path.sep)) {
+    throw new Error(`Invalid project file path: ${relativePath}`);
+  }
+  const bytes = await fs.promises.readFile(resolved);
+  return new Uint8Array(bytes);
+});
+
+ipcMain.handle('project:commitSource', async (event, presentationId, projectFolder) => {
+  requireTrustedSender(event);
+  if (!presentationId) throw new Error('Missing presentation id.');
+  const folder = requireProjectFolder(projectFolder, 'read');
+  await verifyStagedProject(folder);
+
+  const normalizedFolder = persistLinkedProjectFolder(presentationId, folder);
+  recordRecentProject(normalizedFolder);
+
+  let cleanupEligible = false;
+  try {
+    const eligibleIds = config.get('draftCleanupEligiblePresentationIds', []);
+    if (!eligibleIds.includes(presentationId)) {
+      config.set('draftCleanupEligiblePresentationIds', [...eligibleIds, presentationId]);
+    }
+    cleanupEligible = true;
+  } catch (error) {
+    logger.warn('Could not mark draft cache as cleanup-eligible', {
+      presentationId,
+      error: error.message,
+    });
+  }
+
+  return {
+    kind: 'project',
+    presentationId,
+    projectFolder: normalizedFolder,
+    status: 'project',
+    draftCleanupEligible: cleanupEligible,
+  };
+});
+
 function queueProjectSave(presentationId, task) {
   const previous = projectSaveQueues.get(presentationId) ?? Promise.resolve();
   const next = previous.then(task, task);
@@ -465,12 +882,11 @@ ipcMain.handle('project:save', async (event, { presentationId, presentationTitle
   if (!presentationId) throw new Error('Missing presentation id.');
   return queueProjectSave(presentationId, async () => {
     try {
-      let folder = linkedProjectFolders.get(presentationId);
+      let folder = getPresentationSourceDescriptor(presentationId).projectFolder;
       if (forceNewFolder || !folder) {
         const chosen = await chooseNewProjectFolder(presentationTitle);
         if (!chosen) return null;
         folder = chosen;
-        linkedProjectFolders.set(presentationId, folder);
       }
 
       const root = path.resolve(folder);
@@ -490,6 +906,7 @@ ipcMain.handle('project:save', async (event, { presentationId, presentationTitle
         }
       }
       recordRecentProject(folder);
+      persistLinkedProjectFolder(presentationId, folder);
       markPresentationLinked(presentationId);
       logger.info('Project files written successfully', { folder, count: files.length });
       return folder;
@@ -541,6 +958,28 @@ ipcMain.handle('project:openRecent', async (event, projectFolder) => {
   return text;
 });
 
+ipcMain.handle('file:readMediaSibling', async (event, folder, relativePath) => {
+  requireTrustedSender(event);
+  const normFolder = normalizeFilePath(folder);
+  if (!allowedProjectReadFolders.has(normFolder)) {
+    throw new Error('This folder was not authorized for reading.');
+  }
+  if (typeof relativePath !== 'string' || relativePath.includes('..') || path.isAbsolute(relativePath)) {
+    throw new Error(`Invalid file path: ${relativePath}`);
+  }
+  const root = path.resolve(normFolder);
+  const resolved = path.resolve(root, relativePath);
+  if (!resolved.startsWith(root + path.sep)) {
+    throw new Error(`Invalid file path: ${relativePath}`);
+  }
+  try {
+    const bytes = await fs.promises.readFile(resolved);
+    return new Uint8Array(bytes);
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.handle('project:readMediaFile', async (event, projectFolder, relativePath) => {
   requireTrustedSender(event);
   const recent = config.get('recentProjects', []);
@@ -565,18 +1004,49 @@ ipcMain.handle('project:linkPresentation', async (event, presentationId, project
   if (!recent.includes(projectFolder)) {
     throw new Error('This project is not in the recent list.');
   }
-  linkedProjectFolders.set(presentationId, projectFolder);
+  persistLinkedProjectFolder(presentationId, projectFolder);
   markPresentationLinked(presentationId);
 });
 
 ipcMain.handle('project:getLinkedFolder', async (event, presentationId) => {
   requireTrustedSender(event);
-  return linkedProjectFolders.get(presentationId) || null;
+  return getPresentationSourceDescriptor(presentationId).projectFolder;
 });
 
 ipcMain.handle('project:getLinkedIds', async (event) => {
   requireTrustedSender(event);
-  return config.get('linkedPresentationIds', []);
+  return Object.keys(readPersistedProjectFolders());
+});
+
+ipcMain.handle('project:getSource', async (event, presentationId) => {
+  requireTrustedSender(event);
+  return getPresentationSourceDescriptor(presentationId);
+});
+
+ipcMain.handle('project:getSources', async (event) => {
+  requireTrustedSender(event);
+  return Object.entries(readPersistedProjectFolders()).map(([presentationId, projectFolder]) => ({
+    kind: 'project',
+    presentationId,
+    projectFolder,
+    status: 'project',
+  }));
+});
+
+ipcMain.handle('project:releaseSource', async (event, presentationId) => {
+  requireTrustedSender(event);
+  if (!presentationId) return;
+  const mappings = readPersistedProjectFolders();
+  if (Object.hasOwn(mappings, presentationId)) {
+    delete mappings[presentationId];
+    config.set('projectFoldersByPresentationId', mappings);
+  }
+  linkedProjectFolders.delete(presentationId);
+  const eligibleIds = config.get('draftCleanupEligiblePresentationIds', []);
+  config.set(
+    'draftCleanupEligiblePresentationIds',
+    eligibleIds.filter((id) => id !== presentationId),
+  );
 });
 
 let storageFolderPromise = null;

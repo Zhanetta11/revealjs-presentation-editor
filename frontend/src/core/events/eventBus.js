@@ -1,11 +1,23 @@
 import { EditorEventType } from "./editorEvents";
 import { createAutosaveService } from "../persistence/autoSaveService";
 
-export const createEventBus = (dispatchAndCommit, getState, { storageKey, onSaveError, onSaveStatusChange } = {}) => {
+export const createEventBus = (
+  dispatchAndCommit,
+  getState,
+  {
+    storageKey,
+    onSaveError,
+    onSaveStatusChange,
+    getSource,
+    persistProject,
+  } = {},
+) => {
   const autosave = createAutosaveService(getState, {
     storageKey,
     onError: onSaveError,
     onStatusChange: onSaveStatusChange,
+    getSource,
+    persistProject,
   });
 
   return {
@@ -40,6 +52,8 @@ export const createEventBus = (dispatchAndCommit, getState, { storageKey, onSave
       }
     },
     flush: () => autosave.flush(),
+    discardPending: () => autosave.discardPending(),
+    resumePending: () => autosave.resumePending(),
     dispose: () => autosave.dispose(),
   };
 };

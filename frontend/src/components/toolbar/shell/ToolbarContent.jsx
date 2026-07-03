@@ -178,6 +178,7 @@ export default function ToolbarContent({
           canMoveDown={canMoveDown}
           onToggleSlideHidden={onToggleSlideHidden}
           isSlideHidden={isSlideHidden}
+          isSlideMasterOpen={isSlideMasterOpen}
           currentFormatting={currentFormatting}
           onFormatChange={onFormatChange}
           onChangeCase={onChangeCase}

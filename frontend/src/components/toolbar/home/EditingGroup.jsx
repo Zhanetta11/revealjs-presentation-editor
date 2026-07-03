@@ -59,10 +59,6 @@ export default function EditingGroup({
               <MdOutlineFindReplace />
               <span>Replace...</span>
             </button>
-            <button disabled title="Font replacement is not implemented yet">
-              <span className="editing-font-icon">A↔</span>
-              <span>Replace Fonts...</span>
-            </button>
           </div>
         )}
       </div>

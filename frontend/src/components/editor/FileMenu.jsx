@@ -6,7 +6,6 @@ import { isElectron, getElectronAPI } from "../../core/platform/electron";
 import {
   usesProjectFolders,
   useProjectLibrary,
-  openRecentProject,
 } from "../../hooks/useProjectLibrary";
 
 const NAV_ITEMS = [
@@ -24,7 +23,10 @@ const NAV_ITEMS = [
 export default function FileMenu({
   presentationTitle,
   onClose,
+  onClosePresentation,
   onNew,
+  onOpen,
+  onOpenProject,
   onSave,
   onSaveAs,
   onExport,
@@ -39,9 +41,8 @@ export default function FileMenu({
 
   const handleOpenProject = async (key) => {
     try {
-      const id = await openRecentProject(key);
-      navigate(`/editor/${id}`);
-      onClose?.();
+      const opened = await onOpenProject?.(key);
+      if (opened) onClose?.();
     } catch (e) {
       console.error("[FileMenu] Failed to open recent project:", e);
       const message = e?.message ?? "Could not open this presentation.";
@@ -51,7 +52,7 @@ export default function FileMenu({
   };
 
   const handleNav = (item) => {
-    if (item === "Close") { onClose(); return; }
+    if (item === "Close") { onClosePresentation?.(); return; }
     if (item === "Save") { onSave(); onClose(); return; }
     if (item === "Export HTML") { onExport(); onClose(); return; }
     if (item === "Export ZIP") { onExportZip?.(); onClose(); return; }
@@ -61,16 +62,7 @@ export default function FileMenu({
 
   const handleOpen = async () => {
     if (isElectron()) {
-      const api = getElectronAPI();
-      try {
-        const [filePath] = await api.openFile();
-        if (!filePath) return;
-        const content = await api.readFile(filePath);
-        onLoadFile?.(content);
-      } catch (e) {
-        console.error("[FileMenu] Failed to read file:", e);
-        api.showError("Open Failed", e?.message ?? "Could not read this file.");
-      }
+      await onOpen?.();
       return;
     }
     fileInputRef.current?.click();
@@ -213,13 +205,15 @@ export default function FileMenu({
           <div className="file-menu-section">
             <h1>Save As</h1>
             <p className="file-menu-desc">
-              Download <strong>{presentationTitle}</strong> as a JSON file.
+              {isElectron()
+                ? <>Save <strong>{presentationTitle}</strong> to a new project folder.</>
+                : <>Download <strong>{presentationTitle}</strong> as a JSON file.</>}
             </p>
             <button
               className="file-menu-action-btn"
               onClick={() => { onSaveAs(); onClose(); }}
             >
-              Download .json
+              {isElectron() ? "Choose Project Folder" : "Download .json"}
             </button>
           </div>
         )}

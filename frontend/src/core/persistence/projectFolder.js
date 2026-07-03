@@ -3,7 +3,7 @@ import { serializePresentation } from "./serializationOperations";
 
 const extensionFromBlob = (blob, fallback) => (blob.type || "").split("/")[1] || fallback;
 
-const buildResolvedPresentation = async (presentation) => {
+const buildResolvedPresentation = async (presentation, { requireResolvedMedia = false } = {}) => {
   const counters = { image: 1, video: 1, font: 1 };
   const mediaFiles = [];
 
@@ -21,7 +21,12 @@ const buildResolvedPresentation = async (presentation) => {
 
         const mediaKey = child.slice("indexeddb://".length);
         const blob = await getMediaFile(mediaKey);
-        if (!blob) return [key, child];
+        if (!blob) {
+          if (requireResolvedMedia) {
+            throw new Error(`Required project asset is missing from storage: ${mediaKey}`);
+          }
+          return [key, child];
+        }
 
         const kind = isFontRef ? "font" : (value["media-type"] === "video" ? "video" : "image");
         const fallbackExt = kind === "video" ? "mp4" : kind === "font" ? "ttf" : "png";
@@ -41,8 +46,14 @@ const buildResolvedPresentation = async (presentation) => {
   return { resolvedPresentation, mediaFiles };
 };
 
-export const buildProjectManifest = async (presentation) => {
-  const { resolvedPresentation, mediaFiles } = await buildResolvedPresentation(presentation);
+export const buildProjectManifest = async (
+  presentation,
+  { requireResolvedMedia = false } = {},
+) => {
+  const { resolvedPresentation, mediaFiles } = await buildResolvedPresentation(
+    presentation,
+    { requireResolvedMedia },
+  );
   const jsonText = serializePresentation(resolvedPresentation);
   return { jsonText, mediaFiles };
 };

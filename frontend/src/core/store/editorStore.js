@@ -330,6 +330,19 @@ export const editorReducer = (state, event) => {
     case EditorEventType.PRESENTATION.SAVE:
       return { ...state, lastEvent: event, lastUpdated: Date.now() };
 
+    case EditorEventType.PRESENTATION.RENAME: {
+      const title = event.payload.title;
+      return withHistory(state, {
+        ...state,
+        presentation: {
+          ...state.presentation,
+          slideset: { ...state.presentation.slideset, title },
+        },
+        lastEvent: event,
+        lastUpdated: Date.now(),
+      });
+    }
+
     case EditorEventType.PRESENTATION.LOAD: {
       const result = deserializePresentation(event.payload.jsonString);
       if (!result?.data) return state;

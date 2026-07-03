@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useMediaSrc } from "../../../hooks/useMediaSrc";
 import {
@@ -51,6 +51,7 @@ export default function MediaElement({
     : media;
   const isVideo = media["media-type"] === "video";
   const wrapperRef = useRef(null);
+  const videoRef = useRef(null);
   const {
     isCropping,
     cropOrigin,
@@ -97,6 +98,10 @@ export default function MediaElement({
     onUpdateMedia,
     startCropElementDrag,
   });
+
+  useEffect(() => {
+    if (isPlayingVideo) videoRef.current?.play?.().catch(() => {});
+  }, [isPlayingVideo]);
 
   const activeStyleId = previewStyleId ?? externalPreviewStyleId ?? effectiveMedia.effects?.["style-id"];
   const styledMedia = activeStyleId === effectiveMedia.effects?.["style-id"]
@@ -351,10 +356,10 @@ export default function MediaElement({
           {isVideo ? (
             <>
               <video
+                ref={videoRef}
                 src={resolvedSrc} className="canvas-media" style={filteredInnerStyle}
-                preload="metadata"
+                preload={isPlayingVideo ? "metadata" : "none"}
                 controls={isPlayingVideo}
-                onLoadedMetadata={(e) => { e.target.currentTime = 0; }}
                 onEnded={stopVideoPlayback}
               />
               {!isPlayingVideo && (

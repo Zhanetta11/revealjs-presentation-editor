@@ -173,7 +173,7 @@ export function buildMediaFilterStyle(media) {
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
-export function getMediaReflectionPreset(media) {
+function getMediaReflectionPreset(media) {
   const reflectionId = media.effects?.reflectionId;
   if (!reflectionId || reflectionId === "none") return null;
   const preset = findById(REFLECTION_PRESETS, reflectionId);

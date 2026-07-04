@@ -1,6 +1,6 @@
 import { createParagraphId } from "../utils/presentationUtils";
 
-export const parseSpanStyle = (style) => {
+const parseSpanStyle = (style) => {
   const f = {};
 
   if (style.fontWeight) {
@@ -117,7 +117,7 @@ export const getCaretOffset = (el) => {
   return pre.toString().length;
 };
 
-export const getNodeAtOffset = (el, targetOffset) => {
+const getNodeAtOffset = (el, targetOffset) => {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let chars = 0;
   let node;
@@ -143,7 +143,7 @@ export const setCaretOffset = (el, offset) => {
   sel?.addRange(range);
 };
 
-export const paragraphToGlobal = (paragraphs, pIdx, charOffset) => {
+const paragraphToGlobal = (paragraphs, pIdx, charOffset) => {
   let global = charOffset;
   for (let i = 0; i < pIdx; i++) {
     global += (paragraphs[i]?.runs ?? []).reduce(

@@ -221,6 +221,56 @@ export const resolveEffectiveFormatting = (
   return result;
 };
 
+export const resolveListMarkerFormatting = (
+  paragraph,
+  placeholderFormatting = {},
+  masterFormatting = {},
+) => {
+  const paragraphFormatting = paragraph?.formatting ?? {};
+  const firstRunFormatting =
+    (paragraph?.runs ?? []).find((run) => (run.text ?? "").length > 0)
+      ?.formatting ??
+    paragraph?.runs?.[0]?.formatting ??
+    {};
+  return {
+    size: resolveTextStyle(
+      firstRunFormatting.size ?? paragraphFormatting.size,
+      placeholderFormatting.size,
+      masterFormatting.size,
+      "24px",
+    ),
+    font: resolveTextStyle(
+      firstRunFormatting.font ?? paragraphFormatting.font,
+      placeholderFormatting.font,
+      masterFormatting.font,
+      "inherit",
+    ),
+    weight: resolveWeight(
+      firstRunFormatting.weight ?? paragraphFormatting.weight,
+      placeholderFormatting.weight,
+      masterFormatting.weight,
+    ),
+    italics: resolveTextStyle(
+      firstRunFormatting.italics ?? paragraphFormatting.italics,
+      placeholderFormatting.italics,
+      masterFormatting.italics,
+      "normal",
+    ),
+    color: resolveTextStyle(
+      firstRunFormatting.color ?? paragraphFormatting.color,
+      placeholderFormatting.color,
+      masterFormatting.color,
+      "var(--text-dark, black)",
+    ),
+    "line-spacing": resolveTextStyle(
+      paragraphFormatting["line-spacing"],
+      placeholderFormatting["line-spacing"],
+      masterFormatting["line-spacing"],
+      1.2,
+    ),
+  };
+};
+
 const parseIndentValue = (value) => {
   if (value == null || value === "") return null;
   const parsed = Number.parseFloat(value);
@@ -286,6 +336,22 @@ export const resolveParagraphIndentStyles = (
   }
 
   return { paddingLeft, textIndent };
+};
+
+export const resolveCanvasListMarkerLeft = ({
+  align = "left",
+  paddingLeft = null,
+  measuredTextLeft = null,
+}) => {
+  if (
+    (align === "center" || align === "right") &&
+    Number.isFinite(measuredTextLeft)
+  ) {
+    return `calc(${measuredTextLeft}px - ${LIST_MARKER_WIDTH_EM}em)`;
+  }
+  return paddingLeft
+    ? `calc(${paddingLeft} - ${LIST_MARKER_WIDTH_EM}em)`
+    : 0;
 };
 
 export const buildRunStyles = (runFormatting = {}) => {
@@ -384,9 +450,15 @@ export const paragraphsToHTML = (paragraphs, masterFormatting = {}, placeholderF
         masterFormatting,
         listPaddingLeft,
       );
+      const markerFormatting = resolveListMarkerFormatting(
+        paragraph,
+        placeholderFormatting,
+        masterFormatting,
+      );
+      const markerTextStyles = buildRunStyles(markerFormatting);
 
       const markerHtml = renderBullets && listType
-        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.5em;box-sizing:border-box;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.5em;box-sizing:border-box;${markerTextStyles}">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, r(formatting["list-numbered-style"], placeholderFormatting["list-numbered-style"], masterFormatting["list-numbered-style"]))
               : getListMarker(index, "bullets", r(formatting["list-marker"], placeholderFormatting["list-marker"], masterFormatting["list-marker"]), null)

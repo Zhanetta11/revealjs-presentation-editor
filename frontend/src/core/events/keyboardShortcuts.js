@@ -1,4 +1,4 @@
-export const hasPrimaryModifier = (event) => event.ctrlKey || event.metaKey;
+const hasPrimaryModifier = (event) => event.ctrlKey || event.metaKey;
 
 export const isEditableTarget = (target) =>
   target instanceof HTMLInputElement ||

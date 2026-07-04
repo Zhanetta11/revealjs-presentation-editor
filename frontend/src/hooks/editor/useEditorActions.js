@@ -1,13 +1,13 @@
 import { useCallback } from "react";
-import { storageRemove, storeMediaFile } from "../core/persistence/persistenceFacade";
+import { storageRemove, storeMediaFile } from "../../core/persistence/persistenceFacade";
 import {
   EditorEventType,
   createEditorEvent,
-} from "../core/events/editorEvents";
+} from "../../core/events/editorEvents";
 import {
   createAnimation,
   reorderAnimation,
-} from "../core/operations/animationOperations";
+} from "../../core/operations/animationOperations";
 
 export function useEditorActions(
   eventBus,
@@ -664,12 +664,6 @@ export function useEditorActions(
     [eventBus],
   );
 
-  const createNewPresentation = useCallback(
-    () =>
-      eventBus.dispatch(createEditorEvent(EditorEventType.PRESENTATION.CREATE)),
-    [eventBus],
-  );
-
   const resetPresentation = useCallback(() => {
     const key = presentationId
       ? `presentation-${presentationId}`
@@ -833,7 +827,6 @@ export function useEditorActions(
     resetLayout,
     savePresentation,
     toggleAutosave,
-    createNewPresentation,
     resetPresentation,
     undo,
     redo,

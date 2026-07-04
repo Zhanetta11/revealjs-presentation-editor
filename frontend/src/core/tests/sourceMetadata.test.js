@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
 import {
   PresentationSourceKind,
+  PresentationSourcePlatform,
   PresentationSourceStatus,
   createCommittingSource,
   createDraftSource,
   createProjectSource,
+  getPresentationSource,
   normalizePresentationSource,
 } from "../persistence/sourceMetadata";
 
@@ -15,6 +17,7 @@ describe("presentation source metadata", () => {
       presentationId: "draft-id",
       projectFolder: null,
       status: PresentationSourceStatus.DRAFT,
+      platform: PresentationSourcePlatform.BROWSER,
     });
   });
 
@@ -45,6 +48,37 @@ describe("presentation source metadata", () => {
       presentationId: "transition-id",
       projectFolder: "C:\\Presentations\\New",
       status: PresentationSourceStatus.COMMITTING,
+      platform: PresentationSourcePlatform.BROWSER,
     });
+  });
+
+  test("distinguishes browser and Electron sources without changing source kind", () => {
+    expect(createProjectSource(
+      "browser-project",
+      "Browser Project",
+      PresentationSourcePlatform.BROWSER,
+    )).toEqual(expect.objectContaining({
+      kind: PresentationSourceKind.PROJECT,
+      platform: PresentationSourcePlatform.BROWSER,
+    }));
+    expect(createProjectSource(
+      "electron-project",
+      "C:\\Presentations\\Electron Project",
+      PresentationSourcePlatform.ELECTRON,
+    )).toEqual(expect.objectContaining({
+      kind: PresentationSourceKind.PROJECT,
+      platform: PresentationSourcePlatform.ELECTRON,
+    }));
+  });
+
+  test("keeps Browser mode on a draft source when File System Access is unavailable", async () => {
+    delete window.showDirectoryPicker;
+
+    await expect(getPresentationSource("browser-draft")).resolves.toEqual(
+      createDraftSource(
+        "browser-draft",
+        PresentationSourcePlatform.BROWSER,
+      ),
+    );
   });
 });

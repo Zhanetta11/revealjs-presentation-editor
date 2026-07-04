@@ -1,4 +1,4 @@
-export const QUOTA_EXCEEDED_MESSAGE =
+const QUOTA_EXCEEDED_MESSAGE =
   "Browser storage is full. Export your presentation to keep it safe, then free up space by deleting old presentations or unused media.";
 
 export const isQuotaExceededError = (error) =>

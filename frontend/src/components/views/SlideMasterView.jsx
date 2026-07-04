@@ -315,8 +315,8 @@ export function SlideMasterRibbon({
   onClose, presentation, onApplyTheme, onApplyFont, onUpdateDimensions,
   masterName, onRenameMaster, selectedMasterLayoutId, onInsertLayout, onRenameLayout,
   onDeleteLayout,
-  onAddTextElement, onImageUpload, onVideoUpload,
-  onAddContentPlaceholder,
+  onAddTextPlaceholder, onImageUpload, onVideoUpload,
+  onAddContentPlaceholder, onAddTextElement,
   onToggleTitle, onToggleFooters,
 }) {
   const imageInputRef = useRef(null);
@@ -370,7 +370,8 @@ export function SlideMasterRibbon({
   const handleInsertPlaceholder = (type) => {
     setShowPlaceholderMenu(false);
     if (type === "text") {
-      onAddTextElement?.();
+      if (selectedMasterLayoutId) onAddTextPlaceholder?.();
+      else onAddTextElement?.();
     } else if (type === "content") {
       onAddContentPlaceholder?.();
     } else if (type === "image") {
@@ -610,6 +611,8 @@ export default function SlideMasterView({
   selectedMasterElementId,
   onSelectMasterElement,
   onSaveSelection,
+  onStartEditing,
+  onStopEditing,
   onMasterViewChangeText,
   onMasterViewChangeParagraphs,
   onMasterViewFormatText,
@@ -734,6 +737,8 @@ export default function SlideMasterView({
           onChangeParagraphs={onMasterViewChangeParagraphs}
           onFormatTextElement={onMasterViewFormatText}
           onSaveSelection={onSaveSelection}
+          onStartEditing={onStartEditing}
+          onStopEditing={onStopEditing}
           onMoveTextElement={onMasterViewMoveText}
           onResizeTextElement={onMasterViewResizeText}
           onMoveMediaElement={onMasterViewMoveMedia}

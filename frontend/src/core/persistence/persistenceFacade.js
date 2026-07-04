@@ -14,6 +14,7 @@ import { downloadPresentationAsJson } from "./serializationOperations";
 export {
   PresentationSourceKind,
   PresentationSourceStatus,
+  PresentationSourcePlatform,
   createDraftSource,
   createProjectSource,
   createCommittingSource,
@@ -50,6 +51,11 @@ export {
   commitElectronProjectSource,
   writeAndCommitElectronProjectSnapshot,
 } from "./electronProjectFolder";
+export {
+  saveBrowserProjectSnapshot,
+  writeBrowserProjectSnapshot,
+  loadBrowserLinkedProjectSnapshot,
+} from "./browserProjectFolder";
 
 const localStorageSettings = {
   get(key) {

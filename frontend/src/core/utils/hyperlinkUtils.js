@@ -1,6 +1,6 @@
 import { isElectron, getElectronAPI } from "../platform/electron";
 
-export const parseSlideLink = (href) => {
+const parseSlideLink = (href) => {
   const match = /^#slide-(\d+)$/.exec(href ?? "");
   return match ? Number(match[1]) - 1 : null;
 };

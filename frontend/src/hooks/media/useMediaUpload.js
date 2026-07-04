@@ -1,7 +1,7 @@
 import { useCallback } from "react";
-import { storeMediaFile } from "../core/persistence/persistenceFacade";
-import { createImageMediaElement, createVideoMediaElement } from "../core/operations/mediaOperations";
-import { showErrorDialog } from "../core/platform/dialogs";
+import { storeMediaFile } from "../../core/persistence/persistenceFacade";
+import { createImageMediaElement, createVideoMediaElement } from "../../core/operations/mediaOperations";
+import { showErrorDialog } from "../../core/platform/dialogs";
 
 function readImageDimensions(file) {
   return new Promise((resolve) => {

@@ -23,7 +23,9 @@ import {
 } from "../render/revealRenderer";
 import {
   isSafeLinkHref,
+  buildRunStyles,
   resolveParagraphIndentStyles,
+  resolveListMarkerFormatting,
   resolveTextStyle,
   validStyleValue,
 } from "../text/textFormatting";
@@ -350,9 +352,16 @@ export function buildTextElementContent(
         placeholderFormatting,
         masterFormatting,
       );
+      const markerTextStyles = buildRunStyles(
+        resolveListMarkerFormatting(
+          paragraph,
+          placeholderFormatting,
+          masterFormatting,
+        ),
+      );
 
       const markerHtml = listType
-        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.5em;box-sizing:border-box;">${
+        ? `<span style="display:inline-block;width:${LIST_MARKER_WIDTH_EM}em;margin-left:calc(-${LIST_MARKER_WIDTH_EM}em);text-align:right;padding-right:0.5em;box-sizing:border-box;${markerTextStyles}">${
             listType === "numbered"
               ? getListMarker(numberedCounter - 1, "numbered", null, listNumberedStyle)
               : getListMarker(pIdx, "bullets", listMarker, null)

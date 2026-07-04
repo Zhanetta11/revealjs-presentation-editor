@@ -1,10 +1,3 @@
-export const IMAGE_STYLE_GROUPS = [
-  { id: "frames",  label: "Frames"  },
-  { id: "rounded", label: "Rounded" },
-  { id: "shadows", label: "Shadows" },
-  { id: "special", label: "Special" },
-];
-
 export const IMAGE_STYLES = [
   { id: "none", label: "No Style", group: null, css: {} },
 

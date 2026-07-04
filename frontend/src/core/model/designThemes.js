@@ -465,34 +465,3 @@ export const findActiveTheme = (colorTheme) => {
     return a1.slice(0, 7).toLowerCase() === currentAccent1.slice(0, 7).toLowerCase();
   }) ?? null;
 };
-
-export const findCurrentColorScheme = (designTheme, colorSchemes) => {
-  if (!designTheme || !designTheme.decorations?.shapes) return null;
-
-  const shapes = designTheme.decorations.shapes;
-
-  for (const scheme of colorSchemes) {
-    let allMatch = true;
-
-    for (const shape of shapes) {
-      if (shape.colorIndex === undefined) continue;
-
-      const schemeColor = scheme.colors[shape.colorIndex];
-      if (!schemeColor) continue;
-
-      const shapeColor = (shape.fill && shape.fill !== "none" ? shape.fill : shape.stroke)?.toUpperCase().slice(0, 7);
-      const matchColor = schemeColor.toUpperCase().slice(0, 7);
-
-      if (shapeColor !== matchColor) {
-        allMatch = false;
-        break;
-      }
-    }
-
-    if (allMatch && shapes.some(s => s.colorIndex !== undefined)) {
-      return scheme.id;
-    }
-  }
-
-  return null;
-};

@@ -1,5 +1,4 @@
 import { useLayoutEffect, useState } from "react";
-import { getListIndent } from "../../../../../core/utils/listUtils";
 
 export default function useTextLayout({
   editableRef,
@@ -9,6 +8,8 @@ export default function useTextLayout({
   paragraphListInfos,
 }) {
   const [paragraphTops, setParagraphTops] = useState([]);
+  const [paragraphTextLefts, setParagraphTextLefts] = useState([]);
+  const [paragraphTextTops, setParagraphTextTops] = useState([]);
   const [editableOffsetTop, setEditableOffsetTop] = useState(0);
 
   useLayoutEffect(() => {
@@ -21,19 +22,80 @@ export default function useTextLayout({
       );
       paragraphElements.forEach((paragraph, index) => {
         const info = paragraphListInfos[index];
-        paragraph.style.paddingLeft = info?.listType
-          ? `calc(${getListIndent(info.listLevel, info.listType)} + 1.2em)`
-          : getListIndent(info?.listLevel ?? 0, "indent");
+        if (info?.paddingLeft) {
+          paragraph.style.paddingLeft = info.paddingLeft;
+        }
       });
 
       const nextTops = paragraphElements.map(
         (paragraph) => paragraph.offsetTop,
       );
+      const editableRect = editable.getBoundingClientRect();
+      const scaleX =
+        editable.offsetWidth > 0
+          ? editableRect.width / editable.offsetWidth
+          : 1;
+      const scaleY =
+        editable.offsetHeight > 0
+          ? editableRect.height / editable.offsetHeight
+          : 1;
+      const textRects = paragraphElements.map((paragraph) => {
+        const walker = document.createTreeWalker(
+          paragraph,
+          NodeFilter.SHOW_TEXT,
+        );
+        let textNode = walker.nextNode();
+        while (textNode && !textNode.textContent?.length) {
+          textNode = walker.nextNode();
+        }
+        if (!textNode) return null;
+
+        const range = document.createRange();
+        range.selectNodeContents(textNode);
+        return (
+          range.getClientRects?.()[0] ?? range.getBoundingClientRect?.()
+        );
+      });
+      const nextTextLefts = textRects.map((textRect, index) => {
+        const align = paragraphListInfos[index]?.align ?? "left";
+        if (
+          (align !== "center" && align !== "right") ||
+          !textRect ||
+          !Number.isFinite(textRect.left)
+        ) {
+          return null;
+        }
+        return Math.round(
+          (editable.offsetLeft +
+            (textRect.left - editableRect.left) / (scaleX || 1)) *
+          1000,
+        ) / 1000;
+      });
+      const nextTextTops = textRects.map((textRect) => {
+        if (!textRect || !Number.isFinite(textRect.top)) return null;
+        return (
+          Math.round(
+            ((textRect.top - editableRect.top) / (scaleY || 1)) * 1000,
+          ) / 1000
+        );
+      });
       setParagraphTops((current) =>
         current.length === nextTops.length &&
         current.every((top, index) => top === nextTops[index])
           ? current
           : nextTops,
+      );
+      setParagraphTextLefts((current) =>
+        current.length === nextTextLefts.length &&
+        current.every((left, index) => left === nextTextLefts[index])
+          ? current
+          : nextTextLefts,
+      );
+      setParagraphTextTops((current) =>
+        current.length === nextTextTops.length &&
+        current.every((top, index) => top === nextTextTops[index])
+          ? current
+          : nextTextTops,
       );
       setEditableOffsetTop(editable.offsetTop);
     };
@@ -52,5 +114,10 @@ export default function useTextLayout({
     textWidth,
   ]);
 
-  return { paragraphTops, editableOffsetTop };
+  return {
+    paragraphTops,
+    paragraphTextLefts,
+    paragraphTextTops,
+    editableOffsetTop,
+  };
 }

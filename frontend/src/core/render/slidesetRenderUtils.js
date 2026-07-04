@@ -1,4 +1,5 @@
 export { escapeHtml } from "../utils/presentationUtils";
+import { DEFAULT_SLIDE_WIDTH, DEFAULT_SLIDE_HEIGHT } from "../model/slideSizes";
 
 export function getSlideContentIds(slide) {
   const ids = new Set();
@@ -17,8 +18,8 @@ export function getSlideSize(presentation) {
     const dimensions = presentation?.slideset?.master?.["slide-dimensions"];
 
     return {
-        width: dimensions?.width ?? 1280,
-        height: dimensions?.height ?? 720,
+        width: dimensions?.width ?? DEFAULT_SLIDE_WIDTH,
+        height: dimensions?.height ?? DEFAULT_SLIDE_HEIGHT,
     };
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useMediaSrc } from "../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../hooks/media/useMediaSrc";
 import "reveal.js/reveal.css";
 import "reveal.js/theme/white.css";
 import "./PreviewModal.css";

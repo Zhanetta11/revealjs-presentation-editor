@@ -2,6 +2,7 @@ import { createDefaultLayouts } from "./defaultLayouts";
 import { DESIGN_THEMES } from "./designThemes";
 import { createId, createParagraphId } from "../utils/presentationUtils";
 import { DEFAULT_TRANSITION } from "./transitionDefaults";
+import { DEFAULT_SLIDE_WIDTH, DEFAULT_SLIDE_HEIGHT } from "./slideSizes";
 
 const createTextFormatting = ({
   size = "28px",
@@ -146,8 +147,8 @@ export const createDefaultPresentation = () => {
         },
         "aspect-ratio": "16:9",
         "slide-dimensions": {
-          width: 1280,
-          height: 720,
+          width: DEFAULT_SLIDE_WIDTH,
+          height: DEFAULT_SLIDE_HEIGHT,
         },
         "dimension-units": "px",
         "color-theme": (DESIGN_THEMES.find((t) => t.id === "default") ?? DESIGN_THEMES[0]).colorTheme,

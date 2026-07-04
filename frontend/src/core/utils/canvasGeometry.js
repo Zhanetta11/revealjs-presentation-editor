@@ -1,5 +1,5 @@
-export const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
-export const SNAP_THRESHOLD = 5;
+const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+const SNAP_THRESHOLD = 5;
 
 export const normalizeAngle = (angle) => ((angle % 360) + 360) % 360;
 
@@ -48,9 +48,6 @@ export const computeResize = (dir, initial, mouse, canvasWidth, canvasHeight) =>
 
   return { newX, newY, newW, newH };
 };
-
-export const getRotationAngle = (centerX, centerY, mouseX, mouseY) =>
-  (Math.atan2(mouseY - centerY, mouseX - centerX) * 180) / Math.PI + 90;
 
 export const getElementRotationAngle = (element, mouseX, mouseY) => {
   const cx = (element.position?.x ?? 0) + (element.width ?? 300) / 2;

@@ -15,7 +15,7 @@ import FindReplaceDialog from "../components/dialogs/FindReplaceDialog";
 import SelectionPane from "../components/panels/SelectionPane";
 import FormatBackgroundPanel from "../components/toolbar/shared/FormatBackgroundPanel";
 import AltTextPanel from "../components/toolbar/picture-format/AltTextPanel";
-import { useEditorController } from "../hooks/useEditorController";
+import { useEditorController } from "../hooks/editor/useEditorController";
 
 export default function EditorPage() {
   const navigate = useNavigate();
@@ -151,6 +151,7 @@ export default function EditorPage() {
           onRenameLayout={ctrl.renameLayout}
           onDeleteLayout={ctrl.deleteLayout}
           onAddLayoutPlaceholder={ctrl.addLayoutPlaceholder}
+          onAddTextPlaceholder={ctrl.handleAddTextPlaceholder}
           onAddContentPlaceholder={ctrl.handleAddContentPlaceholder}
           onRemoveLayoutPlaceholder={ctrl.removeLayoutPlaceholder}
           onAddMasterElement={ctrl.addMasterElement}
@@ -192,8 +193,10 @@ export default function EditorPage() {
             selectedMasterLayoutId={ctrl.selectedMasterLayoutId}
             onSelectedLayoutChange={ctrl.setSelectedMasterLayoutId}
             selectedMasterElementId={ctrl.selectedMasterElementId}
-            onSelectMasterElement={ctrl.setSelectedMasterElementId}
+            onSelectMasterElement={ctrl.handleMasterElementSelect}
             onSaveSelection={ctrl.handleMasterSaveSelection}
+            onStartEditing={ctrl.handleStartEditing}
+            onStopEditing={ctrl.handleStopEditing}
             onMasterViewChangeText={ctrl.masterViewChangeText}
             onMasterViewChangeParagraphs={ctrl.masterViewChangeParagraphs}
             onMasterViewFormatText={ctrl.masterViewFormatText}

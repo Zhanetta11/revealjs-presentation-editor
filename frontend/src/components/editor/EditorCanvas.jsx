@@ -3,7 +3,7 @@ import "./EditorCanvas.css";
 import { getSlideSize } from "../../core/render/slidesetRenderUtils";
 import { buildColorThemeStyle, buildAdjustedAnimationMap } from "../../core/render/revealRenderer";
 import { useCanvasInteractions } from "../../hooks/useCanvasInteractions";
-import { useMediaSrc } from "../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../hooks/media/useMediaSrc";
 import { TRANSPARENT_SLIDE_BG } from "../../core/operations/slideOperations";
 import TextElement from "../canvas/elements/TextElement";
 import MediaElement from "../canvas/elements/MediaElement";

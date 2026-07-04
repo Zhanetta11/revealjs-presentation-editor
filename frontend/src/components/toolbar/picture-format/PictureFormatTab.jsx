@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useMediaSrc } from "../../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../../hooks/media/useMediaSrc";
 import {
   SHARPEN_PRESETS,
   COLOR_SATURATION,
@@ -1006,9 +1006,6 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
   const resolvedSrc = useMediaSrc(media?.["file-link"]);
   const [openPopover, setOpenPopover] = useState(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState(null);
-  // Slide Master editing has no docked side-panel slot (it's a full-screen
-  // overlay), so it keeps its own local floating panel instead of the
-  // lifted, mutually-exclusive side-panel state used by normal editing.
   const [showAltPanelMaster, setShowAltPanelMaster] = useState(false);
   const showAltPanel = isSlideMasterOpen ? showAltPanelMaster : showAltText;
   const toggleAltPanel = () => {
@@ -1021,13 +1018,8 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
   };
   const isImage = media?.["media-type"] !== "video";
 
-  // Alt text only has any effect on images (<video> has no alt attribute),
-  // so close the panel whenever the selection stops being an image -
-  // switching to a video, another element, or nothing selected.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isImage && showAltPanel) closeAltPanel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isImage]);
   const changeInputRef = useRef(null);
   const [stylePickerPos, setStylePickerPos] = useState(null);

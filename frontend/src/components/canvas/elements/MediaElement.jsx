@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useMediaSrc } from "../../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../../hooks/media/useMediaSrc";
 import {
   buildMediaContainerStyle,
   buildMediaInnerStyle,

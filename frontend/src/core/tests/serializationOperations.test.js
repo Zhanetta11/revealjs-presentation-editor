@@ -1,10 +1,59 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import {
+  downloadPresentationAsJson,
+  findNonPortableAssetReferences,
   serializePresentation,
   deserializePresentation,
 } from "../persistence/serializationOperations";
 import { validateSlideset } from "../operations/slidesetValidation";
 import { createDefaultPresentation } from "../model/defaultPresentation";
+import { applyLayoutToSlide } from "../operations/layoutOperations";
+import { downloadBackend } from "../export/downloadBackend";
+
+const makePlaceholderPresentation = (bodyText, extraFormatting = {}) => ({
+  slideset: {
+    master: { formatting: {} },
+    layouts: [
+      {
+        "layout-id": "with-body",
+        placeholders: [
+          {
+            "placeholder-id": "body-placeholder",
+            type: "text",
+            role: "body",
+            position: { x: 10, y: 10 },
+            width: 200,
+            height: 100,
+            formatting: {},
+          },
+        ],
+      },
+      { "layout-id": "title-only", placeholders: [] },
+    ],
+    slides: [
+      {
+        "layout-id": "with-body",
+        contents: {
+          text: [
+            {
+              id: "body-text",
+              "placeholder-id": "body-placeholder",
+              paragraphs: [
+                { formatting: extraFormatting, runs: [{ text: bodyText, formatting: {} }] },
+              ],
+            },
+          ],
+          media: [],
+        },
+      },
+    ],
+  },
+});
+
+const loadedBodyElement = (presentation) => {
+  const result = deserializePresentation(JSON.stringify(presentation));
+  return result.data.slideset.slides[0].contents.text[0];
+};
 
 describe("serializationOperations", () => {
   test("serializes presentation to JSON string", () => {
@@ -221,5 +270,114 @@ describe("serializationOperations", () => {
     expect(result.errors).toContain(
       "Slide 1 references unknown layout: missing-layout"
     );
+  });
+
+  test.each([
+    "indexeddb://media/image.png",
+    "blob:https://editor.local/runtime-media",
+    "file:///C:/Users/User/AppData/cache/image.png",
+    "C:\\Users\\User\\AppData\\cache\\image.png",
+    "/tmp/editor-cache/image.png",
+  ])("detects non-portable local asset reference %s", (fileLink) => {
+    const presentation = createDefaultPresentation();
+    presentation.slideset.slides[0].contents.media.push({
+      id: "local-image",
+      "media-type": "image",
+      "file-link": fileLink,
+    });
+
+    expect(findNonPortableAssetReferences(presentation)).toEqual([
+      expect.objectContaining({ value: fileLink }),
+    ]);
+  });
+
+  test("blocks standalone JSON when local media references would leak", async () => {
+    const presentation = createDefaultPresentation();
+    presentation.slideset.slides[0].contents.media.push({
+      id: "local-image",
+      "media-type": "image",
+      "file-link": "indexeddb://media/image.png",
+    });
+    const saveText = vi
+      .spyOn(downloadBackend, "saveText")
+      .mockResolvedValue(undefined);
+
+    await expect(downloadPresentationAsJson(presentation)).rejects.toThrow(
+      "Standalone JSON cannot include local media or font references",
+    );
+    expect(saveText).not.toHaveBeenCalled();
+    saveText.mockRestore();
+  });
+
+  test("allows standalone JSON when it has no local runtime references", async () => {
+    const presentation = createDefaultPresentation();
+    const saveText = vi
+      .spyOn(downloadBackend, "saveText")
+      .mockResolvedValue(undefined);
+
+    await downloadPresentationAsJson(presentation);
+
+    expect(saveText).toHaveBeenCalledOnce();
+    expect(saveText.mock.calls[0][0]).not.toContain("indexeddb://");
+    saveText.mockRestore();
+  });
+});
+
+describe("userModified re-derivation on load", () => {
+  test("re-derives userModified for real user text in a placeholder", () => {
+    const el = loadedBodyElement(makePlaceholderPresentation("My real content"));
+    expect(el.userModified).toBe(true);
+  });
+
+  test("does not mark empty placeholder text as userModified", () => {
+    const el = loadedBodyElement(makePlaceholderPresentation(""));
+    expect(el.userModified).not.toBe(true);
+  });
+
+  test("does not mark known prompt text as userModified", () => {
+    const el = loadedBodyElement(makePlaceholderPresentation("Click to edit text"));
+    expect(el.userModified).not.toBe(true);
+  });
+
+  test("does not mark a placeholder's own promptText as userModified", () => {
+    const presentation = makePlaceholderPresentation("Type here");
+    presentation.slideset.layouts[0].placeholders[0].promptText = "Type here";
+    const el = loadedBodyElement(presentation);
+    expect(el.userModified).not.toBe(true);
+  });
+
+  test("userModified is not written to the shared/exported JSON", () => {
+    const loaded = deserializePresentation(
+      JSON.stringify(makePlaceholderPresentation("Kept content")),
+    ).data;
+    expect(loaded.slideset.slides[0].contents.text[0].userModified).toBe(true);
+    expect(serializePresentation(loaded)).not.toContain("userModified");
+  });
+
+  test("user text survives save -> reopen -> layout switch to a layout without the placeholder", () => {
+    const reopened = deserializePresentation(
+      JSON.stringify(makePlaceholderPresentation("Important notes")),
+    ).data;
+    const switched = applyLayoutToSlide(reopened, 0, "title-only");
+    const texts = switched.slideset.slides[0].contents.text;
+    const kept = texts.find((t) =>
+      t.paragraphs?.[0]?.runs?.[0]?.text === "Important notes",
+    );
+    expect(kept).toBeDefined();
+  });
+
+  test("does not touch decorative text boxes (no placeholder-id)", () => {
+    const presentation = makePlaceholderPresentation("box content");
+    delete presentation.slideset.slides[0].contents.text[0]["placeholder-id"];
+    const el = loadedBodyElement(presentation);
+    expect(el.userModified).not.toBe(true);
+  });
+
+  test("preserves explicit formatting overrides while re-deriving userModified", () => {
+    const el = loadedBodyElement(
+      makePlaceholderPresentation("Styled text", { color: "#123456" }),
+    );
+    expect(el.userModified).toBe(true);
+    expect(el.paragraphs[0].formatting.color).toBe("#123456");
   });
 });

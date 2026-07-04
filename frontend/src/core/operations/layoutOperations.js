@@ -116,7 +116,7 @@ const PLACEHOLDER_PROMPTS = {
   body: "Click to edit Master text styles",
 };
 
-export const placeholderPromptText = (placeholder) =>
+const placeholderPromptText = (placeholder) =>
   placeholder.promptText ?? PLACEHOLDER_PROMPTS[placeholder.role] ?? "Click to edit text styles";
 
 export const createPlaceholderPseudoElement = (placeholder) => {
@@ -215,7 +215,7 @@ export const addLayoutElement = (presentation, layoutId, elementType, element) =
   return setLayouts(presentation, updatedLayouts);
 };
 
-export const updateLayoutElementTextContent = (presentation, layoutId, elementId, text) => {
+const updateLayoutElementTextContent = (presentation, layoutId, elementId, text) => {
   const layouts = getLayouts(presentation);
   const updatedLayouts = layouts.map((l) => {
     if (l["layout-id"] !== layoutId) return l;
@@ -309,7 +309,7 @@ export const addLayoutPlaceholder = (presentation, layoutId, placeholder) => {
   return propagateLayoutChanges(presentation, layoutId, updatedPlaceholders);
 };
 
-export const updateLayoutPlaceholder = (presentation, layoutId, placeholderId, updates) => {
+const updateLayoutPlaceholder = (presentation, layoutId, placeholderId, updates) => {
   const layout = getLayouts(presentation).find((l) => l["layout-id"] === layoutId);
   if (!layout) return presentation;
 

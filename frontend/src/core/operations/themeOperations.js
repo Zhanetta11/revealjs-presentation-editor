@@ -23,16 +23,3 @@ export const updateMasterThemeColor = (presentation, colorVariable, hexColor) =>
     },
   };
 };
-
-export const updateMasterColorTheme = (presentation, newColorTheme) => {
-  return {
-    ...presentation,
-    slideset: {
-      ...presentation.slideset,
-      master: {
-        ...presentation.slideset.master,
-        "color-theme": newColorTheme,
-      },
-    },
-  };
-};

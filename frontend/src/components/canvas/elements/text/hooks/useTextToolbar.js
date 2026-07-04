@@ -50,7 +50,11 @@ export default function useTextToolbar({
           8,
           Math.min(rect.left, window.innerWidth - TOOLBAR_WIDTH - 8),
         );
-        setPosition({ top, left });
+        setPosition((previous) =>
+          previous.top === top && previous.left === left
+            ? previous
+            : { top, left },
+        );
       }, 0);
     },
     [editableRef, elementRef],
@@ -58,7 +62,7 @@ export default function useTextToolbar({
 
   const open = useCallback(
     (anchorPoint = null) => {
-      onSelect(textElementId);
+      onSelect(textElementId, { preserveTextEditing: true });
       setIsOpen(true);
       updatePosition(anchorPoint);
     },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getMediaFile } from "../core/persistence/persistenceFacade";
+import { getMediaFile } from "../../core/persistence/persistenceFacade";
 
 export function useMediaSrc(fileLink) {
   const [src, setSrc] = useState(() => {

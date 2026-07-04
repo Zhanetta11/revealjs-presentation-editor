@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { useMediaSrc } from "../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../hooks/media/useMediaSrc";
 import {
   buildColorThemeStyle,
   buildTextElementStyle,

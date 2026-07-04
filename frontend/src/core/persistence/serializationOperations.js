@@ -1,6 +1,34 @@
 import { validateSlideset } from "../operations/slidesetValidation";
 import { migrateParagraphFormatting } from "../text/textFormatting";
+import { CONTENT_PLACEHOLDER_PROMPTS } from "../operations/textOperations";
 import { downloadBackend } from "../export/downloadBackend";
+
+const PLACEHOLDER_ROLE_PROMPTS = {
+  title: "Click to edit title",
+  subtitle: "Click to edit subtitle",
+  footer: "Footer",
+  date: "Date",
+  "slide-number": "#",
+};
+
+const placeholderDefaultText = (placeholder) =>
+  placeholder?.promptText
+  ?? PLACEHOLDER_ROLE_PROMPTS[placeholder?.role]
+  ?? "Click to edit text";
+
+const plainParagraphText = (paragraphs) =>
+  (paragraphs ?? [])
+    .map((p) => (p.runs ?? []).map((r) => r.text ?? "").join(""))
+    .join("\n")
+    .trim();
+
+const isUserModifiedPlaceholderText = (paragraphs, placeholder) => {
+  const text = plainParagraphText(paragraphs);
+  if (text === "") return false;
+  if (CONTENT_PLACEHOLDER_PROMPTS.has(text)) return false;
+  if (text === placeholderDefaultText(placeholder)) return false;
+  return true;
+};
 
 const collectUsedFonts = (presentation) => {
   const fontNames = new Set();
@@ -147,6 +175,50 @@ const computeParagraphBullets = (presentation) => {
 };
 
 const INTERNAL_FIELDS = new Set(["userSetKeys", "userModified", "isPlaceholder"]);
+const ASSET_REFERENCE_FIELDS = new Set(["file-link", "font-file"]);
+
+const isNonPortableLocalAssetReference = (value) => {
+  if (typeof value !== "string" || value.length === 0) return false;
+  return (
+    value.startsWith("indexeddb://")
+    || value.startsWith("blob:")
+    || value.startsWith("file://")
+    || /^[a-zA-Z]:[\\/]/.test(value)
+    || /^\\\\/.test(value)
+    || value.startsWith("/")
+  );
+};
+
+export const findNonPortableAssetReferences = (value) => {
+  const references = [];
+  const visited = new WeakSet();
+
+  const walk = (current, path) => {
+    if (!current || typeof current !== "object") return;
+    if (visited.has(current)) return;
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      current.forEach((item, index) => walk(item, `${path}[${index}]`));
+      return;
+    }
+
+    Object.entries(current).forEach(([key, child]) => {
+      const childPath = path ? `${path}.${key}` : key;
+      if (
+        ASSET_REFERENCE_FIELDS.has(key)
+        && isNonPortableLocalAssetReference(child)
+      ) {
+        references.push({ path: childPath, value: child });
+      } else {
+        walk(child, childPath);
+      }
+    });
+  };
+
+  walk(value, "");
+  return references;
+};
 
 const stripInternalFields = (obj) => {
   if (Array.isArray(obj)) return obj.map(stripInternalFields);
@@ -167,7 +239,7 @@ const migratePresentation = (presentation) => {
   for (const layout of layouts) {
     const layoutPlaceholders = new Map();
     for (const ph of layout.placeholders ?? []) {
-      layoutPlaceholders.set(ph["placeholder-id"], ph.formatting ?? {});
+      layoutPlaceholders.set(ph["placeholder-id"], ph);
     }
     placeholderMap.set(layout["layout-id"], layoutPlaceholders);
   }
@@ -177,14 +249,21 @@ const migratePresentation = (presentation) => {
     contents: {
       ...slide.contents,
       text: (slide.contents?.text ?? []).map((el) => {
-        const phFormatting =
-          placeholderMap
-            .get(slide["layout-id"])
-            ?.get(el["placeholder-id"]) ?? {};
-        return {
+        const placeholder =
+          placeholderMap.get(slide["layout-id"])?.get(el["placeholder-id"]) ?? null;
+        const phFormatting = placeholder?.formatting ?? {};
+        const migrated = {
           ...el,
           paragraphs: migrateParagraphFormatting(el.paragraphs, phFormatting, masterFormatting),
         };
+        if (
+          el["placeholder-id"]
+          && el.userModified !== true
+          && isUserModifiedPlaceholderText(migrated.paragraphs, placeholder)
+        ) {
+          migrated.userModified = true;
+        }
+        return migrated;
       }),
     },
   }));
@@ -237,6 +316,13 @@ export const deserializePresentation = (jsonString) => {
 };
 
 export const downloadPresentationAsJson = async (presentation) => {
+  const localReferences = findNonPortableAssetReferences(presentation);
+  if (localReferences.length > 0) {
+    throw new Error(
+      "Standalone JSON cannot include local media or font references. "
+      + "Save a project folder or use ZIP export so the asset files are included.",
+    );
+  }
   const json = serializePresentation(presentation);
   const filename = presentation.slideset?.filename ?? "untitled-presentation";
   await downloadBackend.saveText(json, filename.endsWith(".json") ? filename : `${filename}.json`, "application/json");

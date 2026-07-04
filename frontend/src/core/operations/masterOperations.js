@@ -3,6 +3,7 @@ import { TITLE_PLACEHOLDER, FOOTER_PLACEHOLDERS, createMasterTextElement } from 
 import { applyFormattingToParagraphs } from "../text/textFormatting";
 import { createParagraphId } from "../utils/presentationUtils";
 import { clampCrop } from "../model/mediaCrop";
+import { DEFAULT_SLIDE_WIDTH, DEFAULT_SLIDE_HEIGHT } from "../model/slideSizes";
 
 const MASTER_FOOTER_IDS = ["master-footer-date", "master-footer-center", "master-footer-page"];
 
@@ -238,8 +239,8 @@ export const updateMasterDimensions = (
   dimensionUnits,
 ) => {
   const oldDim = presentation?.slideset?.master?.["slide-dimensions"];
-  const oldW = oldDim?.width ?? 1280;
-  const oldH = oldDim?.height ?? 720;
+  const oldW = oldDim?.width ?? DEFAULT_SLIDE_WIDTH;
+  const oldH = oldDim?.height ?? DEFAULT_SLIDE_HEIGHT;
   const newW = slideDimensions.width;
   const newH = slideDimensions.height;
 

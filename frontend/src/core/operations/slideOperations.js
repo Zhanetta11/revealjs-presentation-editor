@@ -198,7 +198,7 @@ export const updateSlideNotes = (presentation, slideIndex, notes) => {
   return setSlides(presentation, slides);
 };
 
-export const getSlideCommentCount = (slide) =>
+const getSlideCommentCount = (slide) =>
   (slide?.contents?.comments ?? []).length;
 
 export const getSlideCommentCounts = (slides) =>

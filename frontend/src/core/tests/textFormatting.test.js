@@ -10,6 +10,9 @@ import {
   buildRunStyles,
   computeCurrentFormatting,
   runsToHTML,
+  resolveParagraphIndentStyles,
+  resolveCanvasListMarkerLeft,
+  resolveListMarkerFormatting,
 } from "../text/textFormatting";
 
 describe("key classification", () => {
@@ -168,6 +171,192 @@ describe("paragraphsToHTML", () => {
     const para = makePara("Item", { "list-type": "bullets" });
     const html = paragraphsToHTML([para]);
     expect(html).toContain("padding-left");
+  });
+
+  it("renders a numbered marker with a dot", () => {
+    const para = makePara("Hello", { "list-type": "numbered", "list-numbered-style": "decimal" });
+    const html = paragraphsToHTML([para], {}, {}, true);
+    expect(html).toContain(">1.</span>");
+  });
+
+  it("renders numbered marker with hanging spacing (right-aligned, gap before text)", () => {
+    const para = makePara("Hello", { "list-type": "numbered" });
+    const html = paragraphsToHTML([para], {}, {}, true);
+    expect(html).toContain("text-align:right");
+    expect(html).toContain("padding-right:0.5em");
+    expect(html).toContain("margin-left:calc(-1.8em)");
+  });
+
+  it("uses the first text run formatting for the list marker", () => {
+    const paragraph = makePara(
+      "Hello",
+      { "list-type": "bullets", color: "#111111", size: "24px" },
+      {
+        color: "#ff0000",
+        size: "32px",
+        font: "Georgia",
+        weight: "bold",
+        italics: "italic",
+      },
+    );
+    const markerFormatting = resolveListMarkerFormatting(
+      paragraph,
+      {},
+      {},
+    );
+    expect(markerFormatting).toMatchObject({
+      color: "#ff0000",
+      size: "32px",
+      font: "Georgia",
+      weight: "bold",
+      italics: "italic",
+    });
+    const html = paragraphsToHTML([paragraph], {}, {}, true);
+    const markerSpan = html.slice(0, html.indexOf(">•</span>"));
+    expect(markerSpan).toContain("color:#ff0000");
+    expect(markerSpan).toContain("font-size:32px");
+    expect(markerSpan).toContain("font-family:Georgia");
+    expect(markerSpan).toContain("font-weight:bold");
+    expect(markerSpan).toContain("font-style:italic");
+  });
+
+  it("falls back from run to paragraph, placeholder, and master marker formatting", () => {
+    const markerFormatting = resolveListMarkerFormatting(
+      makePara("Hello", { "list-type": "numbered", weight: "bold" }),
+      { color: "#123456", size: "28px" },
+      { font: "Arial" },
+    );
+    expect(markerFormatting).toMatchObject({
+      weight: "bold",
+      color: "#123456",
+      size: "28px",
+      font: "Arial",
+    });
+  });
+
+  it("uses selected-run size with the paragraph line spacing for a list marker", () => {
+    const paragraph = makePara(
+      "Hello",
+      {
+        "list-type": "bullets",
+        size: "32px",
+        "line-spacing": 1.4,
+      },
+      { size: "18px" },
+    );
+
+    expect(resolveListMarkerFormatting(paragraph, {}, {})).toMatchObject({
+      size: "18px",
+      "line-spacing": 1.4,
+    });
+  });
+
+  it("numbers consecutive numbered paragraphs 1. 2. 3.", () => {
+    const html = paragraphsToHTML(
+      [
+        makePara("a", { "list-type": "numbered" }),
+        makePara("b", { "list-type": "numbered" }),
+        makePara("c", { "list-type": "numbered" }),
+      ],
+      {}, {}, true,
+    );
+    expect(html).toContain(">1.</span>");
+    expect(html).toContain(">2.</span>");
+    expect(html).toContain(">3.</span>");
+  });
+
+  it("inherits list-type from the placeholder (Content placeholder case)", () => {
+    const para = makePara("Hello", {});
+    const html = paragraphsToHTML([para], {}, { "list-type": "numbered" }, true);
+    expect(html).toContain(">1.</span>");
+  });
+
+  it("explicit list-type: none blocks inherited list formatting", () => {
+    const para = makePara("Hello", { "list-type": "none" });
+    const html = paragraphsToHTML([para], {}, { "list-type": "numbered" }, true);
+    expect(html).not.toContain(">1.</span>");
+    expect(html).not.toContain("margin-left:calc(-1.8em)");
+  });
+
+  it("canvas overlay and preview reserve identical list indent (same source fn)", () => {
+    const formatting = { "list-type": "numbered", "indent-level": 0 };
+    const listPaddingLeft = "calc(0px + 1.8em)";
+    const { paddingLeft } = resolveParagraphIndentStyles(formatting, {}, {}, listPaddingLeft);
+    const html = paragraphsToHTML([makePara("Hello", formatting)], {}, {}, true);
+    expect(html).toContain(`padding-left:${paddingLeft}`);
+  });
+
+  it("centers a numbered canvas marker against the measured text group", () => {
+    expect(
+      resolveCanvasListMarkerLeft({
+        align: "center",
+        paddingLeft: "calc(0px + 1.8em)",
+        measuredTextLeft: 240,
+      }),
+    ).toBe("calc(240px - 1.8em)");
+  });
+
+  it("centers a bullet canvas marker against the measured text group", () => {
+    expect(
+      resolveCanvasListMarkerLeft({
+        align: "center",
+        paddingLeft: "calc(24px + 1.8em)",
+        measuredTextLeft: 180,
+      }),
+    ).toBe("calc(180px - 1.8em)");
+  });
+
+  it("right-aligns a numbered canvas marker with the preview text group", () => {
+    const html = paragraphsToHTML(
+      [makePara("Item", { "list-type": "numbered", align: "right" })],
+      {},
+      {},
+      true,
+    );
+    expect(html).toContain("text-align:right");
+    expect(html).toContain("width:1.8em");
+    expect(
+      resolveCanvasListMarkerLeft({
+        align: "right",
+        paddingLeft: "calc(0px + 1.8em)",
+        measuredTextLeft: 320,
+      }),
+    ).toBe("calc(320px - 1.8em)");
+  });
+
+  it("uses identical centered marker geometry for Text and Content placeholders", () => {
+    const textPlaceholderLeft = resolveCanvasListMarkerLeft({
+      align: "center",
+      paddingLeft: "calc(0px + 1.8em)",
+      measuredTextLeft: 200,
+    });
+    const contentPlaceholderLeft = resolveCanvasListMarkerLeft({
+      align: "center",
+      paddingLeft: "calc(0px + 1.8em)",
+      measuredTextLeft: 200,
+    });
+    expect(textPlaceholderLeft).toBe(contentPlaceholderLeft);
+  });
+
+  it("keeps the previous left-aligned marker gutter geometry", () => {
+    expect(
+      resolveCanvasListMarkerLeft({
+        align: "left",
+        paddingLeft: "calc(48px + 1.8em)",
+        measuredTextLeft: 400,
+      }),
+    ).toBe("calc(calc(48px + 1.8em) - 1.8em)");
+  });
+
+  it("Text and Content placeholders resolve the same list indent", () => {
+    const listPaddingLeft = "calc(0px + 1.8em)";
+    const textPlaceholder = resolveParagraphIndentStyles(
+      { "list-type": "numbered" }, {}, {}, listPaddingLeft,
+    );
+    const contentPlaceholder = resolveParagraphIndentStyles(
+      {}, { "list-type": "numbered" }, {}, listPaddingLeft,
+    );
+    expect(textPlaceholder.paddingLeft).toBe(contentPlaceholder.paddingLeft);
   });
 
   it("renders Before text indentation for ordinary paragraphs", () => {

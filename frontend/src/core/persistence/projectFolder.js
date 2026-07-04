@@ -1,5 +1,8 @@
 import { getMediaFile } from "./mediaStorage";
-import { serializePresentation } from "./serializationOperations";
+import {
+  findNonPortableAssetReferences,
+  serializePresentation,
+} from "./serializationOperations";
 
 const extensionFromBlob = (blob, fallback) => (blob.type || "").split("/")[1] || fallback;
 
@@ -54,6 +57,16 @@ export const buildProjectManifest = async (
     presentation,
     { requireResolvedMedia },
   );
+  if (requireResolvedMedia) {
+    const unresolvedReferences =
+      findNonPortableAssetReferences(resolvedPresentation);
+    if (unresolvedReferences.length > 0) {
+      throw new Error(
+        `Project snapshot contains a non-portable local asset reference: `
+        + unresolvedReferences[0].path,
+      );
+    }
+  }
   const jsonText = serializePresentation(resolvedPresentation);
   return { jsonText, mediaFiles };
 };

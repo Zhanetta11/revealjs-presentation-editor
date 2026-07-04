@@ -13,44 +13,77 @@ export const PresentationSourceStatus = Object.freeze({
   PROJECT: "project",
 });
 
-export const createDraftSource = (presentationId) => ({
+export const PresentationSourcePlatform = Object.freeze({
+  BROWSER: "browser",
+  ELECTRON: "electron",
+});
+
+const currentSourcePlatform = () =>
+  isElectron()
+    ? PresentationSourcePlatform.ELECTRON
+    : PresentationSourcePlatform.BROWSER;
+
+const normalizeSourcePlatform = (platform) =>
+  platform === PresentationSourcePlatform.ELECTRON
+    ? PresentationSourcePlatform.ELECTRON
+    : platform === PresentationSourcePlatform.BROWSER
+      ? PresentationSourcePlatform.BROWSER
+      : currentSourcePlatform();
+
+export const createDraftSource = (
+  presentationId,
+  platform = currentSourcePlatform(),
+) => ({
   kind: PresentationSourceKind.DRAFT,
   presentationId,
   projectFolder: null,
   status: PresentationSourceStatus.DRAFT,
+  platform: normalizeSourcePlatform(platform),
 });
 
-export const createProjectSource = (presentationId, projectFolder) => ({
+export const createProjectSource = (
+  presentationId,
+  projectFolder,
+  platform = currentSourcePlatform(),
+) => ({
   kind: PresentationSourceKind.PROJECT,
   presentationId,
   projectFolder,
   status: PresentationSourceStatus.PROJECT,
+  platform: normalizeSourcePlatform(platform),
 });
 
-export const createCommittingSource = (presentationId, projectFolder = null) => ({
+export const createCommittingSource = (
+  presentationId,
+  projectFolder = null,
+  platform = currentSourcePlatform(),
+) => ({
   kind: projectFolder ? PresentationSourceKind.PROJECT : PresentationSourceKind.DRAFT,
   presentationId,
   projectFolder,
   status: PresentationSourceStatus.COMMITTING,
+  platform: normalizeSourcePlatform(platform),
 });
 
 export const normalizePresentationSource = (source, presentationId) => {
   const id = source?.presentationId || presentationId;
+  const platform = normalizeSourcePlatform(source?.platform);
   if (
     source?.kind === PresentationSourceKind.PROJECT
     && source?.status === PresentationSourceStatus.PROJECT
     && typeof source?.projectFolder === "string"
     && source.projectFolder.length > 0
   ) {
-    return createProjectSource(id, source.projectFolder);
+    return createProjectSource(id, source.projectFolder, platform);
   }
   if (source?.status === PresentationSourceStatus.COMMITTING) {
     return createCommittingSource(
       id,
       typeof source?.projectFolder === "string" ? source.projectFolder : null,
+      platform,
     );
   }
-  return createDraftSource(id);
+  return createDraftSource(id, platform);
 };
 
 export async function getPresentationSource(presentationId) {

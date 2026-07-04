@@ -4,6 +4,53 @@ import {
   getSelectionFormatting,
 } from "../text/textFormatting";
 import { getPlaceholderFormatting } from "../render/slidesetRenderUtils";
+import { createPlaceholderPseudoElement } from "./layoutOperations";
+
+const getParagraphTextLength = (paragraph) =>
+  (paragraph?.runs ?? []).reduce(
+    (length, run) => length + String(run?.text ?? "").length,
+    0,
+  );
+
+export const isStoredTextSelectionValid = ({
+  selection,
+  elementId,
+  textElement,
+  isEditing,
+}) => {
+  if (!selection || !isEditing || selection.elementId !== elementId) return false;
+
+  const paragraphs = textElement?.paragraphs ?? [];
+  const startParagraphIdx = Number(selection.paragraphIdx);
+  const endParagraphIdx = Number(
+    selection.endParagraphIdx ?? selection.paragraphIdx,
+  );
+  const rangeStart = Number(selection.rangeStart);
+  const rangeEnd = Number(selection.rangeEnd);
+
+  if (
+    !Number.isInteger(startParagraphIdx) ||
+    !Number.isInteger(endParagraphIdx) ||
+    !Number.isInteger(rangeStart) ||
+    !Number.isInteger(rangeEnd) ||
+    startParagraphIdx < 0 ||
+    endParagraphIdx < startParagraphIdx ||
+    endParagraphIdx >= paragraphs.length ||
+    rangeStart < 0 ||
+    rangeEnd < 0
+  ) {
+    return false;
+  }
+
+  if (
+    rangeStart > getParagraphTextLength(paragraphs[startParagraphIdx]) ||
+    rangeEnd > getParagraphTextLength(paragraphs[endParagraphIdx])
+  ) {
+    return false;
+  }
+
+  return startParagraphIdx !== endParagraphIdx || rangeStart <= rangeEnd;
+};
 
 export const findMasterTextElement = (
   presentation,
@@ -27,16 +74,14 @@ export const findMasterTextElement = (
       (p) => p["placeholder-id"] === selectedMasterElementId && p.type === "text",
     );
     if (placeholder) {
+      const pseudoElement = createPlaceholderPseudoElement(placeholder);
       return {
-        id: placeholder["placeholder-id"],
-        "placeholder-id": placeholder["placeholder-id"],
-        isPlaceholder: true,
-        paragraphs: [{
-          id: `ph-para-${placeholder["placeholder-id"]}`,
-          formatting: placeholder.formatting ?? {},
-          bullets: "none",
-          runs: [{ text: "", formatting: {}, "super-sub-script": "normal", link: null }],
-        }],
+        ...pseudoElement,
+        paragraphs: pseudoElement.paragraphs.map((paragraph, index) =>
+          index === 0
+            ? { ...paragraph, formatting: placeholder.formatting ?? {} }
+            : paragraph,
+        ),
       };
     }
   }
@@ -67,19 +112,24 @@ export const computeFormattingState = ({
     paragraphFormatting,
   );
 
+  const validSelection = isStoredTextSelectionValid({
+    selection: activeSelectionForFormatting,
+    elementId: activeElementId,
+    textElement: activeTextEl,
+    isEditing: isEditingSelected,
+  })
+    ? activeSelectionForFormatting
+    : null;
   const hasRealSelection =
-    activeSelectionForFormatting &&
-    activeSelectionForFormatting.elementId === activeElementId &&
+    validSelection &&
     !(
-      activeSelectionForFormatting.paragraphIdx ===
-        (activeSelectionForFormatting.endParagraphIdx ??
-          activeSelectionForFormatting.paragraphIdx) &&
-      activeSelectionForFormatting.rangeStart ===
-        activeSelectionForFormatting.rangeEnd
+      validSelection.paragraphIdx ===
+        (validSelection.endParagraphIdx ?? validSelection.paragraphIdx) &&
+      validSelection.rangeStart === validSelection.rangeEnd
     );
 
   const rawSelFmt = hasRealSelection
-    ? (getSelectionFormatting(activeTextEl, activeSelectionForFormatting) ?? {})
+    ? (getSelectionFormatting(activeTextEl, validSelection) ?? {})
     : null;
   const selectionFormatting = rawSelFmt
     ? {
@@ -92,7 +142,7 @@ export const computeFormattingState = ({
     ? { ...selectionFormatting, ...pendingFormatting }
     : computeCurrentFormatting({
         isEditing: isEditingSelected,
-        activeSelection: activeSelectionForFormatting,
+        activeSelection: validSelection,
         selectedElementId: activeElementId,
         selectedTextEl: activeTextEl,
         effectiveFormatting,

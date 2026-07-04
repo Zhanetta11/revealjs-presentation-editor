@@ -56,7 +56,7 @@ const sameRunStyle = (left, right) =>
     (right?.["super-sub-script"] ?? "normal") &&
   JSON.stringify(left?.link ?? null) === JSON.stringify(right?.link ?? null);
 
-export const mergeClipboardRuns = (runs = []) => {
+const mergeClipboardRuns = (runs = []) => {
   const merged = [];
   for (const sourceRun of runs.filter(Boolean)) {
     const run = {
@@ -76,7 +76,7 @@ export const mergeClipboardRuns = (runs = []) => {
     : [{ text: "", formatting: {}, "super-sub-script": "normal", link: null }];
 };
 
-export const buildClipboardRun = (text, formatting = {}) => {
+const buildClipboardRun = (text, formatting = {}) => {
   const runFormatting = Object.fromEntries(
     Object.entries(formatting).filter(
       ([key, value]) =>
@@ -355,4 +355,3 @@ export const insertClipboardParagraphs = (
     },
   };
 };
-

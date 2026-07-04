@@ -1,4 +1,4 @@
-export const toRoman = (n) => {
+const toRoman = (n) => {
   if (!Number.isFinite(n) || n <= 0) return "";
   const vals = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
   const syms = ["M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"];
@@ -15,7 +15,7 @@ export const toRoman = (n) => {
   return result;
 };
 
-export const toAlpha = (n, upper = false) => {
+const toAlpha = (n, upper = false) => {
   if (!Number.isFinite(n) || n <= 0) return "";
 
   let result = "";
@@ -61,62 +61,4 @@ export const getListMarker = (
     default:
       return `${n}.`;
   }
-};
-
-export const increaseIndent = (currentFormatting = {}) => ({
-  "indent-level": Math.min(
-    MAX_LIST_INDENT_LEVEL,
-    (currentFormatting["indent-level"] ?? 0) + 1
-  ),
-});
-
-export const decreaseIndent = (currentFormatting = {}) => {
-  const level = currentFormatting["indent-level"] ?? 0;
-
-  if (level <= 0) {
-    return {
-      "list-type": "none",
-      "list-marker": null,
-      "list-numbered-style": null,
-      "indent-level": 0,
-    };
-  }
-
-  return {
-    "indent-level": level - 1,
-  };
-};
-
-export const toggleList = (
-  currentFormatting = {},
-  type,
-  defaultStyle
-) => {
-  const isActive = currentFormatting["list-type"] === type;
-
-  if (isActive) {
-    return {
-      "list-type": "none",
-      "list-marker": null,
-      "list-numbered-style": null,
-      "indent-level": 0,
-    };
-  }
-
-  if (type === "bullets") {
-    return {
-      "list-type": "bullets",
-      "list-marker": defaultStyle ?? currentFormatting["list-marker"] ?? "•",
-      "list-numbered-style": null,
-      "indent-level": currentFormatting["indent-level"] ?? 0,
-    };
-  }
-
-  return {
-    "list-type": "numbered",
-    "list-numbered-style":
-      defaultStyle ?? currentFormatting["list-numbered-style"] ?? "decimal",
-    "list-marker": null,
-    "indent-level": currentFormatting["indent-level"] ?? 0,
-  };
 };

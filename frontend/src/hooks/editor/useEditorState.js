@@ -6,9 +6,9 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { createInitialEditorState, editorReducer } from "../core/store/editorStore";
-import { createEventBus } from "../core/events/eventBus";
-import { EditorEventType, createEditorEvent } from "../core/events/editorEvents";
+import { createInitialEditorState, editorReducer } from "../../core/store/editorStore";
+import { createEventBus } from "../../core/events/eventBus";
+import { EditorEventType, createEditorEvent } from "../../core/events/editorEvents";
 import {
   storageGet,
   updateIndexEntry,
@@ -17,8 +17,10 @@ import {
   getPresentationSource,
   writeElectronProjectSnapshot,
   loadElectronProjectSnapshot,
-} from "../core/persistence/persistenceFacade";
-import { isElectron } from "../core/platform/electron";
+  writeBrowserProjectSnapshot,
+  loadBrowserLinkedProjectSnapshot,
+} from "../../core/persistence/persistenceFacade";
+import { isElectron } from "../../core/platform/electron";
 
 const AUTOSAVE_SETTING_KEY = "autosaveEnabled";
 
@@ -107,18 +109,23 @@ export function useEditorState(presentationId, { onSaveError } = {}) {
     [commitCoordinator],
   );
   const getAutosaveSource = useCallback(
-    () => isElectron()
-      ? sourceCoordinator.get()
-      : createDraftSource(presentationId),
-    [presentationId, sourceCoordinator],
+    () => sourceCoordinator.get(),
+    [sourceCoordinator],
   );
   const persistProject = useCallback(
-    ({ presentationId: id, presentation, projectFolder }) =>
-      writeElectronProjectSnapshot({
-        presentationId: id,
-        presentation,
-        projectFolder,
-      }),
+    ({ presentationId: id, presentation, projectFolder, source }) => {
+      if (source?.platform === "browser" || !isElectron()) {
+        return writeBrowserProjectSnapshot({
+          presentationId: id,
+          presentation,
+        });
+      }
+      return writeElectronProjectSnapshot({
+          presentationId: id,
+          presentation,
+          projectFolder,
+        });
+    },
     [],
   );
 
@@ -165,9 +172,22 @@ export function useEditorState(presentationId, { onSaveError } = {}) {
       .catch(() => createDraftSource(presentationId))
       .then(async (source) => {
         if (cancelled) return null;
-        const saved = isElectron() && source.kind === "project"
-          ? (await loadElectronProjectSnapshot(source.projectFolder)).jsonText
-          : await storageGet(storageKey);
+        let saved;
+        if (source.kind === "project") {
+          try {
+            saved = source.platform === "browser"
+              ? (await loadBrowserLinkedProjectSnapshot(presentationId)).jsonText
+              : (await loadElectronProjectSnapshot(source.projectFolder)).jsonText;
+          } catch (error) {
+            console.warn(
+              "[EditorState] Could not load the active project folder; using local recovery data:",
+              error,
+            );
+            saved = await storageGet(storageKey);
+          }
+        } else {
+          saved = await storageGet(storageKey);
+        }
         return { saved, source };
       })
       .then((loaded) => {

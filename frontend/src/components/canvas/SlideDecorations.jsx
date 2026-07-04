@@ -1,4 +1,4 @@
-import { useMediaSrc } from "../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../hooks/media/useMediaSrc";
 import { paragraphsToHTML } from "../../core/text/textFormatting";
 import {
   buildMediaContainerStyle,

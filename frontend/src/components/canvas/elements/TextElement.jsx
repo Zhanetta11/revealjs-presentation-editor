@@ -18,6 +18,9 @@ import {
   getFormattingAtCursor,
   resolveTextStyle,
   resolveEffectiveFormatting,
+  resolveParagraphIndentStyles,
+  resolveCanvasListMarkerLeft,
+  resolveListMarkerFormatting,
 } from "../../../core/text/textFormatting";
 import {
   getListMarker,
@@ -165,23 +168,41 @@ export default function TextElement({
 
   const paragraphListInfos = (textElement.paragraphs ?? []).map((p) => {
     const pFmt = p.formatting ?? {};
-    const firstRunFmt =
-      (p.runs ?? []).find((run) => (run.text ?? "").length > 0)?.formatting ??
-      p.runs?.[0]?.formatting ??
-      {};
     const resolvedListType =
       pFmt["list-type"]
       ?? placeholderFormatting["list-type"]
       ?? masterFormatting["list-type"]
       ?? null;
     const pListType = resolvedListType && resolvedListType !== "none" ? resolvedListType : null;
+    const listLevel =
+      pFmt["indent-level"]
+      ?? placeholderFormatting["indent-level"]
+      ?? masterFormatting["indent-level"]
+      ?? 0;
+    const listPaddingLeft = pListType
+      ? `calc(${getListIndent(listLevel, pListType)} + ${LIST_MARKER_WIDTH_EM}em)`
+      : null;
+    const { paddingLeft } = resolveParagraphIndentStyles(
+      pFmt,
+      placeholderFormatting,
+      masterFormatting,
+      listPaddingLeft,
+    );
+    const markerFormatting = resolveListMarkerFormatting(
+      p,
+      placeholderFormatting,
+      masterFormatting,
+    );
     return {
       listType: pListType,
-      listLevel:
-        pFmt["indent-level"]
-        ?? placeholderFormatting["indent-level"]
-        ?? masterFormatting["indent-level"]
-        ?? 0,
+      listLevel,
+      paddingLeft,
+      align: resolveTextStyle(
+        pFmt.align,
+        placeholderFormatting.align,
+        masterFormatting.align,
+        "left",
+      ),
       listMarker:
         pFmt["list-marker"]
         ?? placeholderFormatting["list-marker"]
@@ -193,35 +214,16 @@ export default function TextElement({
         ?? masterFormatting["list-numbered-style"]
         ?? "decimal",
       markerStyle: {
-        fontSize: resolveTextStyle(
-          firstRunFmt.size,
-          pFmt.size ?? placeholderFormatting.size,
-          masterFormatting.size,
-          "24px",
-        ),
-        lineHeight: resolveTextStyle(
-          pFmt["line-spacing"],
-          placeholderFormatting["line-spacing"],
-          masterFormatting["line-spacing"],
-          1.2,
-        ),
-        fontFamily: resolveTextStyle(
-          firstRunFmt.font,
-          pFmt.font ?? placeholderFormatting.font,
-          masterFormatting.font,
-          "inherit",
-        ),
-        fontWeight: resolveWeight(
-          firstRunFmt.weight ?? pFmt.weight,
-          placeholderFormatting.weight,
-          masterFormatting.weight,
-        ),
-        color: resolveTextStyle(
-          firstRunFmt.color,
-          pFmt.color ?? placeholderFormatting.color,
-          masterFormatting.color,
-          "var(--text-dark, black)",
-        ),
+        fontSize: markerFormatting.size,
+        lineHeight: markerFormatting["line-spacing"],
+        fontFamily: markerFormatting.font,
+        fontWeight: markerFormatting.weight,
+        fontStyle:
+          markerFormatting.italics === true ||
+          markerFormatting.italics === "italic"
+            ? "italic"
+            : "normal",
+        color: markerFormatting.color,
       },
     };
   });
@@ -242,7 +244,12 @@ export default function TextElement({
       (onPlaceholderImageClick || onPlaceholderVideoClick);
 
   const innerHTML = paragraphsToHTML(textElement.paragraphs, masterFormatting, placeholderFormatting);
-  const { paragraphTops, editableOffsetTop } = useTextLayout({
+  const {
+    paragraphTops,
+    paragraphTextLefts,
+    paragraphTextTops,
+    editableOffsetTop,
+  } = useTextLayout({
     editableRef,
     innerHTML,
     textWidth: textElement.width,
@@ -449,8 +456,15 @@ export default function TextElement({
                   key={i}
                   className="list-marker-line"
                   style={{
-                    top: `${paragraphTops[i] ?? 0}px`,
-                    width: `calc(${getListIndent(info.listLevel, info.listType)} + ${LIST_MARKER_WIDTH_EM}em)`,
+                    top: `${
+                      paragraphTextTops[i] ?? paragraphTops[i] ?? 0
+                    }px`,
+                    left: resolveCanvasListMarkerLeft({
+                      align: info.align,
+                      paddingLeft: info.paddingLeft,
+                      measuredTextLeft: paragraphTextLefts[i],
+                    }),
+                    width: `${LIST_MARKER_WIDTH_EM}em`,
                     ...info.markerStyle,
                   }}
                 >

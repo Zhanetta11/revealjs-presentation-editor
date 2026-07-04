@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import {
   splitFormattingUpdates,
   RUN_LEVEL_KEYS,
-} from "../core/text/textFormatting";
+} from "../../core/text/textFormatting";
 
 export const useApplyFormatting = ({
   activeSelectionRef,

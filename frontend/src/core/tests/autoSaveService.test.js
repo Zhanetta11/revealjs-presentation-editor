@@ -73,6 +73,7 @@ describe("autosave persistence destination", () => {
         presentationId: "project-1",
         projectFolder: "C:\\Projects\\Autosave Project",
         status: "project",
+        platform: "electron",
       }),
       persistProject,
     });
@@ -83,6 +84,36 @@ describe("autosave persistence destination", () => {
       presentationId: "project-1",
       presentation: editorState.presentation,
       projectFolder: "C:\\Projects\\Autosave Project",
+    }));
+    expect(storageSet).not.toHaveBeenCalled();
+    expect(updateIndexEntry).not.toHaveBeenCalled();
+  });
+
+  test("writes a browser project to its project sink instead of the draft cache", async () => {
+    const persistProject = vi.fn().mockResolvedValue({
+      projectFolder: "Browser Project",
+      verified: true,
+    });
+    const source = {
+      kind: "project",
+      presentationId: "browser-project-1",
+      projectFolder: "Browser Project",
+      status: "project",
+      platform: "browser",
+    };
+    const service = createAutosaveService(() => editorState, {
+      storageKey: "presentation-browser-project-1",
+      getSource: () => source,
+      persistProject,
+    });
+
+    await service.saveImmediately();
+
+    expect(persistProject).toHaveBeenCalledWith(expect.objectContaining({
+      presentationId: "browser-project-1",
+      presentation: editorState.presentation,
+      projectFolder: "Browser Project",
+      source,
     }));
     expect(storageSet).not.toHaveBeenCalled();
     expect(updateIndexEntry).not.toHaveBeenCalled();

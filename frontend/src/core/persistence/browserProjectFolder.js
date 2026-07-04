@@ -1,4 +1,6 @@
 import { linkedFolderStore, recentProjectsStore } from "./browserProjectDb";
+import { buildProjectManifest } from "./projectFolder";
+import { rehydrateProjectManifestJson } from "./projectMediaRehydrate";
 
 const sanitizeFolderName = (name) => {
   const cleaned = String(name || "Untitled Presentation")
@@ -80,6 +82,58 @@ async function readFileFromFolder(folderHandle, relativePath) {
   return new Uint8Array(await file.arrayBuffer());
 }
 
+async function writeSnapshotFiles(folderHandle, files) {
+  const manifest = files.find((file) => file.relativePath === "presentation.json");
+  if (!manifest) throw new Error("Project snapshot is missing presentation.json.");
+
+  for (const file of files) {
+    if (file === manifest) continue;
+    const content = file.kind === "binary" ? file.bytes : file.text;
+    await writeFileToFolder(folderHandle, file.relativePath, content);
+  }
+
+  const manifestContent =
+    manifest.kind === "binary" ? manifest.bytes : manifest.text;
+  await writeFileToFolder(
+    folderHandle,
+    manifest.relativePath,
+    manifestContent,
+  );
+}
+
+async function buildBrowserProjectFiles(presentation) {
+  const { jsonText, mediaFiles } = await buildProjectManifest(presentation, {
+    requireResolvedMedia: true,
+  });
+  const assetFiles = await Promise.all(
+    mediaFiles.map(async ({ relativePath, blob }) => ({
+      relativePath,
+      kind: "binary",
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+    })),
+  );
+  return [
+    ...assetFiles,
+    {
+      relativePath: "presentation.json",
+      kind: "text",
+      text: jsonText,
+    },
+  ];
+}
+
+async function getWritableLinkedFolder(presentationId) {
+  const folderHandle = await linkedFolderStore.get(presentationId);
+  if (!folderHandle) {
+    throw new Error("The presentation is not linked to a browser project folder.");
+  }
+  const permission = await folderHandle.queryPermission({ mode: "readwrite" });
+  if (permission !== "granted") {
+    throw new Error("Write permission for the browser project folder is unavailable.");
+  }
+  return folderHandle;
+}
+
 export async function saveProjectToBrowserFolder({ presentationId, presentationTitle, files, forceNewFolder }) {
   if (!presentationId) throw new Error("Missing presentation id.");
 
@@ -98,15 +152,74 @@ export async function saveProjectToBrowserFolder({ presentationId, presentationT
     folderName = folderHandle.name;
   }
 
-  for (const file of files) {
-    const content = file.kind === "binary" ? file.bytes : file.text;
-    await writeFileToFolder(folderHandle, file.relativePath, content);
-  }
+  await writeSnapshotFiles(folderHandle, files);
 
   await linkedFolderStore.set(presentationId, folderHandle);
   await recentProjectsStore.upsert({ handle: folderHandle, title: presentationTitle || folderName });
 
   return folderName;
+}
+
+export async function saveBrowserProjectSnapshot({
+  presentationId,
+  presentation,
+  forceNewFolder = false,
+}) {
+  const presentationTitle =
+    presentation?.slideset?.title
+    ?? presentation?.slideset?.filename
+    ?? "Untitled Presentation";
+  const files = await buildBrowserProjectFiles(presentation);
+  const projectFolder = await saveProjectToBrowserFolder({
+    presentationId,
+    presentationTitle,
+    files,
+    forceNewFolder,
+  });
+  return projectFolder
+    ? { projectFolder, verified: true }
+    : null;
+}
+
+export async function writeBrowserProjectSnapshot({
+  presentationId,
+  presentation,
+}) {
+  if (!presentationId) throw new Error("Missing presentation id.");
+  const folderHandle = await getWritableLinkedFolder(presentationId);
+  const files = await buildBrowserProjectFiles(presentation);
+  await writeSnapshotFiles(folderHandle, files);
+
+  const title =
+    presentation?.slideset?.title
+    ?? presentation?.slideset?.filename
+    ?? folderHandle.name;
+  await recentProjectsStore.upsert({ handle: folderHandle, title });
+  return { projectFolder: folderHandle.name, verified: true };
+}
+
+export async function loadBrowserLinkedProjectSnapshot(presentationId) {
+  if (!presentationId) throw new Error("Missing presentation id.");
+  const folderHandle = await linkedFolderStore.get(presentationId);
+  if (!folderHandle) {
+    throw new Error("The presentation is not linked to a browser project folder.");
+  }
+  const permission = await folderHandle.queryPermission({ mode: "read" });
+  if (permission !== "granted") {
+    throw new Error("Read permission for the browser project folder is unavailable.");
+  }
+
+  const fileHandle = await folderHandle.getFileHandle("presentation.json");
+  const file = await fileHandle.getFile();
+  const jsonText = await rehydrateProjectManifestJson(
+    await file.text(),
+    (relativePath) => readFileFromFolder(folderHandle, relativePath),
+    {
+      cacheKeyForPath: (relativePath) =>
+        `media/browser-project-${presentationId}-${relativePath.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
+    },
+  );
+  return { jsonText, projectFolder: folderHandle.name };
 }
 
 export async function getBrowserLinkedFolderName(presentationId) {

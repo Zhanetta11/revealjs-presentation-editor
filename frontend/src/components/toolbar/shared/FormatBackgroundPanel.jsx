@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { MdClose } from "react-icons/md";
-import { useMediaSrc } from "../../../hooks/useMediaSrc";
+import { useMediaSrc } from "../../../hooks/media/useMediaSrc";
 import "./FormatBackgroundPanel.css";
 
 function hexToRgb(hex) {

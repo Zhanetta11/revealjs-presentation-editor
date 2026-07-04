@@ -205,7 +205,7 @@ export default function FileMenu({
           <div className="file-menu-section">
             <h1>Save As</h1>
             <p className="file-menu-desc">
-              {isElectron()
+              {usesProjectFolders()
                 ? <>Save <strong>{presentationTitle}</strong> to a new project folder.</>
                 : <>Download <strong>{presentationTitle}</strong> as a JSON file.</>}
             </p>
@@ -213,7 +213,7 @@ export default function FileMenu({
               className="file-menu-action-btn"
               onClick={() => { onSaveAs(); onClose(); }}
             >
-              {isElectron() ? "Choose Project Folder" : "Download .json"}
+              {usesProjectFolders() ? "Choose Project Folder" : "Download .json"}
             </button>
           </div>
         )}

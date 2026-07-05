@@ -36,6 +36,7 @@ import {
 } from "../utils/listUtils";
 import { downloadHtml } from "./downloadHtml";
 import { downloadBackend } from "./downloadBackend";
+import { TRANSPARENT_SLIDE_BG } from "../operations/slideOperations";
 import { getMediaFile } from "../persistence/persistenceFacade";
 import { fontFormat, fontExtension } from "../utils/fontFormat";
 import JSZip from "jszip";
@@ -495,7 +496,7 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
   const transitionSpeed = TRANSITION_SPEED_MAP[transitionDuration] ?? "default";
   const rawBackground = slide.contents?.background ?? null;
   const isImageBackground = rawBackground && typeof rawBackground === "object" && rawBackground.type === "image";
-  const background = !rawBackground || isImageBackground
+  const background = !rawBackground || isImageBackground || rawBackground === TRANSPARENT_SLIDE_BG
     ? "var(--bg-light, white)"
     : rawBackground;
   const backgroundImageHtml = isImageBackground

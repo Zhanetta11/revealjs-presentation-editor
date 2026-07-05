@@ -22,6 +22,10 @@ import {
 } from "../../store/editorStore";
 import { EditorEventType, createEditorEvent } from "../../events/editorEvents";
 import { exportToReveal } from "../../export/exportToReveal";
+import {
+  serializePresentation,
+  deserializePresentation,
+} from "../../persistence/serialization/serializationOperations";
 
 describe("transitions, speaker notes, and backgrounds through reducer and export", () => {
   let capturedBlob;
@@ -132,6 +136,49 @@ describe("transitions, speaker notes, and backgrounds through reducer and export
 
     const html = await exportedHtml(state.presentation);
     expect(html).toContain("background: #FFEE00FF");
+  });
+
+  test("the transparent-background sentinel resolves to the theme background in the export", async () => {
+    let state = createInitialEditorState();
+    state = editorReducer(
+      state,
+      createEditorEvent(EditorEventType.MASTER.UPDATE_THEME_COLOR, {
+        colorVariable: "bg-light",
+        hexColor: "#0C2340",
+      }),
+    );
+    state = editorReducer(state, createEditorEvent(EditorEventType.SLIDE.ADD, {}));
+    expect(state.presentation.slideset.slides[1].contents.background).toBe(
+      "#FFFFFFFF",
+    );
+
+    const html = await exportedHtml(state.presentation);
+
+    expect(html).toContain("--bg-light: #0C2340FF");
+    expect(html).not.toContain("background: #FFFFFFFF");
+    expect(html.split("background: var(--bg-light").length - 1).toBe(2);
+  });
+
+  test("import (serialize/deserialize) keeps the background sentinel and theme colors bit-exact", () => {
+    let state = createInitialEditorState();
+    state = editorReducer(
+      state,
+      createEditorEvent(EditorEventType.MASTER.UPDATE_THEME_COLOR, {
+        colorVariable: "bg-light",
+        hexColor: "#0C2340",
+      }),
+    );
+    state = editorReducer(state, createEditorEvent(EditorEventType.SLIDE.ADD, {}));
+
+    const { data, errors } = deserializePresentation(
+      serializePresentation(state.presentation),
+    );
+    expect(errors).toEqual([]);
+
+    expect(data.slideset.slides[1].contents.background).toBe("#FFFFFFFF");
+    expect(data.slideset.master["color-theme"]).toEqual(
+      state.presentation.slideset.master["color-theme"],
+    );
   });
 
   test("apply-background-to-all recolors every slide and is undoable in one step", async () => {

@@ -18,13 +18,13 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import { createDefaultPresentation } from "../../model/defaultPresentation";
 import { addTextElement } from "../../operations/textOperations";
 import { addAnimation, createAnimation } from "../../operations/animationOperations";
 import { addFontEntry } from "../../operations/fontOperations";
-import { storeMediaFile } from "../../persistence/mediaStorage";
+import { storeMediaFile } from "../../persistence/storage/mediaStorage";
 import { exportToReveal } from "../../export/exportToReveal";
 
 describe("animation + font export pipeline integration", () => {

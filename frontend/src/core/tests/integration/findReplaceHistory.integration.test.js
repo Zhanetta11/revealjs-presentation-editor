@@ -8,7 +8,7 @@ import { EditorEventType, createEditorEvent } from "../../events/editorEvents";
 import {
   serializePresentation,
   deserializePresentation,
-} from "../../persistence/serializationOperations";
+} from "../../persistence/serialization/serializationOperations";
 import { validateSlideset } from "../../operations/slidesetValidation";
 import { addSlide } from "../../operations/slideOperations";
 import { addTextElement } from "../../operations/textOperations";

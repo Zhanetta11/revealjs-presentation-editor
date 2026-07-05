@@ -238,10 +238,16 @@ export async function getBrowserRecentProjects() {
   return list.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }));
 }
 
-export async function openBrowserRecentProject(recentId) {
+export async function openBrowserRecentProject(
+  recentId,
+  { writable = false } = {},
+) {
   const entry = await recentProjectsStore.get(recentId);
   if (!entry) throw new Error("This project is not in the recent list.");
-  const allowed = await verifyPermission(entry.handle, "read");
+  const allowed = await verifyPermission(
+    entry.handle,
+    writable ? "readwrite" : "read",
+  );
   if (!allowed) throw new Error("Permission to access this folder was denied.");
   const fileHandle = await entry.handle.getFileHandle("presentation.json");
   const file = await fileHandle.getFile();
@@ -258,6 +264,23 @@ export async function linkBrowserRecentProject(presentationId, recentId) {
   const entry = await recentProjectsStore.get(recentId);
   if (!entry) throw new Error("This project is not in the recent list.");
   await linkedFolderStore.set(presentationId, entry.handle);
+}
+
+export async function isBrowserRecentProjectLinkedToPresentation(
+  presentationId,
+  recentId,
+) {
+  if (!presentationId || !recentId) return false;
+  const [linkedHandle, recentEntry] = await Promise.all([
+    linkedFolderStore.get(presentationId),
+    recentProjectsStore.get(recentId),
+  ]);
+  if (!linkedHandle || !recentEntry?.handle) return false;
+  try {
+    return await linkedHandle.isSameEntry(recentEntry.handle);
+  } catch {
+    return false;
+  }
 }
 
 export async function removeBrowserRecentProject(recentId) {

@@ -258,6 +258,64 @@ const sliceRuns = (runs = [], start, end) => {
   return result;
 };
 
+export const extractClipboardParagraphs = (paragraphs, selection) => {
+  if (!selection || !Array.isArray(paragraphs) || paragraphs.length === 0) {
+    return [];
+  }
+
+  const anchor = {
+    paragraphIdx: selection.paragraphIdx,
+    offset: selection.rangeStart,
+  };
+  const focus = {
+    paragraphIdx: selection.endParagraphIdx ?? selection.paragraphIdx,
+    offset: selection.rangeEnd,
+  };
+  const anchorComesFirst =
+    anchor.paragraphIdx < focus.paragraphIdx ||
+    (anchor.paragraphIdx === focus.paragraphIdx &&
+      anchor.offset <= focus.offset);
+  const start = anchorComesFirst ? anchor : focus;
+  const end = anchorComesFirst ? focus : anchor;
+
+  if (
+    !Number.isInteger(start.paragraphIdx) ||
+    !Number.isInteger(end.paragraphIdx) ||
+    start.paragraphIdx < 0 ||
+    end.paragraphIdx >= paragraphs.length ||
+    (start.paragraphIdx === end.paragraphIdx && start.offset === end.offset)
+  ) {
+    return [];
+  }
+
+  return paragraphs
+    .slice(start.paragraphIdx, end.paragraphIdx + 1)
+    .map((paragraph, relativeIndex) => {
+      const paragraphIdx = start.paragraphIdx + relativeIndex;
+      const textLength = paragraphTextLength(paragraph);
+      const from =
+        paragraphIdx === start.paragraphIdx
+          ? Math.max(0, Math.min(start.offset, textLength))
+          : 0;
+      const to =
+        paragraphIdx === end.paragraphIdx
+          ? Math.max(0, Math.min(end.offset, textLength))
+          : textLength;
+      return {
+        ...paragraph,
+        formatting: { ...(paragraph.formatting ?? {}) },
+        runs: sliceRuns(paragraph.runs, from, to),
+      };
+    });
+};
+
+export const clipboardParagraphsToPlainText = (paragraphs = []) =>
+  paragraphs
+    .map((paragraph) =>
+      (paragraph.runs ?? []).map((run) => run.text ?? "").join(""),
+    )
+    .join("\n");
+
 export const insertClipboardParagraphs = (
   paragraphs,
   selection,

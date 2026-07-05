@@ -3,11 +3,14 @@ const numericZIndex = (element) => {
   return Number.isFinite(value) ? value : 1;
 };
 
+const Z_ORDER_COLLECTIONS = ["text", "media", "shapes", "tables", "groups"];
+
 export const getElementsInZOrder = (slide) => {
-  const elements = [
-    ...(slide?.contents?.text ?? []),
-    ...(slide?.contents?.media ?? []),
-  ];
+  const elements = Z_ORDER_COLLECTIONS.flatMap((collection) =>
+    Array.isArray(slide?.contents?.[collection])
+      ? slide.contents[collection]
+      : [],
+  );
 
   return elements
     .map((element, sourceIndex) => ({ element, sourceIndex }))

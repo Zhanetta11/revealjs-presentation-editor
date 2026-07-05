@@ -10,19 +10,19 @@ const {
   storeMediaFileAtKey: vi.fn(),
 }));
 
-vi.mock("../persistence/mediaStorage", () => ({
+vi.mock("../persistence/storage/mediaStorage", () => ({
   getMediaFile,
   storeMediaFile,
   storeMediaFileAtKey,
 }));
 
-import { buildProjectManifest } from "../persistence/projectFolder";
+import { buildProjectManifest } from "../persistence/project/projectFolder";
 import {
   writeElectronProjectSnapshot,
   writeAndCommitElectronProjectSnapshot,
   loadElectronProjectSnapshot,
   openElectronProjectFolder,
-} from "../persistence/electronProjectFolder";
+} from "../persistence/project/electronProjectFolder";
 
 const createPresentationWithImage = () => ({
   slideset: {

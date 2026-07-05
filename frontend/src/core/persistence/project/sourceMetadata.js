@@ -1,5 +1,5 @@
-import { isElectron, getElectronAPI } from "../platform/electron";
-import { supportsFileSystemAccess } from "../platform/fileSystemAccess";
+import { isElectron, getElectronAPI } from "../../platform/electron";
+import { supportsFileSystemAccess } from "../../platform/fileSystemAccess";
 import { getBrowserLinkedFolderName } from "./browserProjectFolder";
 
 export const PresentationSourceKind = Object.freeze({

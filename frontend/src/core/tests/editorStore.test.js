@@ -192,6 +192,47 @@ describe("editorReducer", () => {
     expect(result.past).toHaveLength(1);
   });
 
+  test("ELEMENT.UPDATE_MANY updates z-index across all element collections", () => {
+    const initial = createInitialEditorState();
+    const slide = initial.presentation.slideset.slides[0];
+    const state = {
+      ...initial,
+      presentation: {
+        ...initial.presentation,
+        slideset: {
+          ...initial.presentation.slideset,
+          slides: [{
+            ...slide,
+            contents: {
+              ...slide.contents,
+              shapes: [{ id: "shape-1", "z-index": 1 }],
+              tables: [{ id: "table-1", "z-index": 2 }],
+              groups: [{ id: "group-1", "z-index": 3 }],
+            },
+          }],
+        },
+      },
+    };
+
+    const result = editorReducer(state, {
+      type: EditorEventType.ELEMENT.UPDATE_MANY,
+      payload: {
+        updates: [
+          { elementId: "shape-1", updates: { "z-index": 3 } },
+          { elementId: "table-1", updates: { "z-index": 1 } },
+          { elementId: "group-1", updates: { "z-index": 2 } },
+        ],
+      },
+    });
+    const contents =
+      result.presentation.slideset.slides[0].contents;
+
+    expect(contents.shapes[0]["z-index"]).toBe(3);
+    expect(contents.tables[0]["z-index"]).toBe(1);
+    expect(contents.groups[0]["z-index"]).toBe(2);
+    expect(result.past).toHaveLength(1);
+  });
+
   test("groups media replacement into one atomic history transaction", () => {
     let state = createInitialEditorState();
     const textId = state.presentation.slideset.slides[0].contents.text[0].id;

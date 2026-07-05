@@ -1,7 +1,7 @@
-import { validateSlideset } from "../operations/slidesetValidation";
-import { migrateParagraphFormatting } from "../text/textFormatting";
-import { CONTENT_PLACEHOLDER_PROMPTS } from "../operations/textOperations";
-import { downloadBackend } from "../export/downloadBackend";
+import { validateSlideset } from "../../operations/slidesetValidation";
+import { migrateParagraphFormatting } from "../../text/textFormatting";
+import { CONTENT_PLACEHOLDER_PROMPTS } from "../../operations/textOperations";
+import { downloadBackend } from "../../export/downloadBackend";
 
 const PLACEHOLDER_ROLE_PROMPTS = {
   title: "Click to edit title",

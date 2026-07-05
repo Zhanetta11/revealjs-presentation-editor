@@ -12,14 +12,18 @@ import {
   deleteDraftManifest,
   deletePresentation,
   downloadPresentationAsJson,
+  getPresentationSource,
   openElectronProjectFolder,
   saveBrowserProjectSnapshot,
   writeAndCommitElectronProjectSnapshot,
 } from "../../core/persistence/persistenceFacade";
-import { deserializePresentation } from "../../core/persistence/serializationOperations";
-import { importPresentationFromJson } from "../../core/persistence/importPresentation";
-import { rehydrateProjectManifestJson } from "../../core/persistence/projectMediaRehydrate";
-import { openRecentProject } from "../useProjectLibrary";
+import { deserializePresentation } from "../../core/persistence/serialization/serializationOperations";
+import { importPresentationFromJson } from "../../core/persistence/serialization/importPresentation";
+import { rehydrateProjectManifestJson } from "../../core/persistence/project/projectMediaRehydrate";
+import {
+  isRecentProjectCurrentSource,
+  openRecentProject,
+} from "../useProjectLibrary";
 
 export function useEditorPersistenceController({
   presentationId,
@@ -143,7 +147,21 @@ export function useEditorPersistenceController({
   }, [presentation]);
 
   const handleSave = useCallback(async () => {
-    const sourceBeforeSave = presentationSource;
+    let sourceBeforeSave = presentationSource;
+    if (isElectron() && sourceBeforeSave.kind !== "project") {
+      try {
+        const restoredSource = await getPresentationSource(presentationId);
+        if (restoredSource.kind === "project") {
+          sourceBeforeSave = restoredSource;
+          setPresentationSource(restoredSource);
+        }
+      } catch (error) {
+        console.warn(
+          "[EditorPage] Could not refresh Electron project source:",
+          error,
+        );
+      }
+    }
     const result = await savePresentation();
     if (!result.success || !canUseProjectFolders) return;
     if (sourceBeforeSave.kind === "project") return;
@@ -182,10 +200,12 @@ export function useEditorPersistenceController({
     }
   }, [
     presentationSource,
+    presentationId,
     savePresentation,
     saveProjectToFolder,
     canUseProjectFolders,
     promptForPresentationName,
+    setPresentationSource,
   ]);
 
   const handleSaveAs = useCallback(async () => {
@@ -351,12 +371,36 @@ export function useEditorPersistenceController({
 
   const handleOpenRecentProject = useCallback(
     async (key) => {
+      const isCurrentProject = await isRecentProjectCurrentSource(
+        key,
+        presentationId,
+        presentationSource,
+      );
       if (!(await prepareToLeave())) return false;
-      const id = await openRecentProject(key);
-      navigate(`/editor/${id}`);
+      if (isCurrentProject) {
+        navigate(`/editor/${presentationId}`, {
+          replace: true,
+          state: { reloadPresentationToken: crypto.randomUUID() },
+        });
+        return true;
+      }
+      const id = await openRecentProject(key, { asDraftCopy: false });
+      const navigationOptions = id === presentationId
+        ? {
+            replace: true,
+            state: { reloadPresentationToken: crypto.randomUUID() },
+          }
+        : undefined;
+      if (navigationOptions) navigate(`/editor/${id}`, navigationOptions);
+      else navigate(`/editor/${id}`);
       return true;
     },
-    [navigate, prepareToLeave],
+    [
+      navigate,
+      prepareToLeave,
+      presentationId,
+      presentationSource,
+    ],
   );
 
   const handleLoadFile = useCallback(
@@ -391,13 +435,37 @@ export function useEditorPersistenceController({
 
   const openElectronProjectFromFolder = useCallback(
     async (projectFolder) => {
+      const isCurrentProject = await isRecentProjectCurrentSource(
+        projectFolder,
+        presentationId,
+        presentationSource,
+      );
       if (!(await prepareToLeave())) return false;
-      const { presentationId: id } =
-        await openElectronProjectFolder(projectFolder);
-      navigate(`/editor/${id}`);
+      if (isCurrentProject) {
+        navigate(`/editor/${presentationId}`, {
+          replace: true,
+          state: { reloadPresentationToken: crypto.randomUUID() },
+        });
+        return true;
+      }
+      const id =
+        (await openElectronProjectFolder(projectFolder)).presentationId;
+      const navigationOptions = id === presentationId
+        ? {
+            replace: true,
+            state: { reloadPresentationToken: crypto.randomUUID() },
+          }
+        : undefined;
+      if (navigationOptions) navigate(`/editor/${id}`, navigationOptions);
+      else navigate(`/editor/${id}`);
       return true;
     },
-    [navigate, prepareToLeave],
+    [
+      navigate,
+      prepareToLeave,
+      presentationId,
+      presentationSource,
+    ],
   );
 
   const handleElectronOpen = useCallback(async () => {

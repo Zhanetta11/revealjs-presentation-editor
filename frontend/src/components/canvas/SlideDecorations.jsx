@@ -235,7 +235,7 @@ export default function SlideDecorations({ presentation, width, height, hideMast
               background: bg,
               overflow: "hidden",
               pointerEvents: "none",
-              zIndex: 3,
+              zIndex: p["z-index"] ?? 1,
               transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
               boxSizing: "border-box",
             }}

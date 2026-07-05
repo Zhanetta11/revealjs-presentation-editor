@@ -1,5 +1,5 @@
-import { createPresentation, savePresentation } from "./persistenceFacade";
-import { DEFAULT_PRESENTATION_TITLE } from "../utils/presentationUtils";
+import { createPresentation, savePresentation } from "../persistenceFacade";
+import { DEFAULT_PRESENTATION_TITLE } from "../../utils/presentationUtils";
 import { deserializePresentation } from "./serializationOperations";
 
 const MAX_IMPORT_BYTES = 25 * 1024 * 1024;

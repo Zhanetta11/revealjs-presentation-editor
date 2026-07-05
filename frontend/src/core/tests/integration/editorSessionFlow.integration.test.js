@@ -7,7 +7,7 @@ import { EditorEventType, createEditorEvent } from "../../events/editorEvents";
 import {
   serializePresentation,
   deserializePresentation,
-} from "../../persistence/serializationOperations";
+} from "../../persistence/serialization/serializationOperations";
 import { validateSlideset } from "../../operations/slidesetValidation";
 
 describe("editor session flow (integration)", () => {

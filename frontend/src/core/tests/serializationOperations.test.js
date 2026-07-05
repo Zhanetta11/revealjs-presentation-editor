@@ -4,7 +4,7 @@ import {
   findNonPortableAssetReferences,
   serializePresentation,
   deserializePresentation,
-} from "../persistence/serializationOperations";
+} from "../persistence/serialization/serializationOperations";
 import { validateSlideset } from "../operations/slidesetValidation";
 import { createDefaultPresentation } from "../model/defaultPresentation";
 import { applyLayoutToSlide } from "../operations/layoutOperations";

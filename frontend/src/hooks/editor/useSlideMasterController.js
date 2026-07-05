@@ -11,6 +11,7 @@ export function useSlideMasterController({
   selectedMasterLayoutId,
   selectedMasterLayout,
   selectedMasterElementId,
+  selectedMasterElementIds,
   masterTextIds,
   masterMediaIds,
   beginHistory,
@@ -40,10 +41,16 @@ export function useSlideMasterController({
 
   const arrangeMasterViewElement = useCallback(
     (mode) => {
-      if (!selectedMasterElementId) return;
+      const selectedIds =
+        selectedMasterElementIds?.length > 0
+          ? selectedMasterElementIds
+          : selectedMasterElementId
+            ? [selectedMasterElementId]
+            : [];
+      if (selectedIds.length === 0) return;
       const updates = createZOrderUpdates(
         activeMasterSlide,
-        [selectedMasterElementId],
+        selectedIds,
         mode,
       );
       if (updates.length === 0) return;
@@ -67,6 +74,7 @@ export function useSlideMasterController({
       beginHistory,
       commitHistory,
       selectedMasterElementId,
+      selectedMasterElementIds,
       selectedMasterLayoutId,
       updateLayoutItem,
       updateMasterElement,
@@ -381,26 +389,35 @@ export function useSlideMasterController({
   );
 
   const masterViewDeleteSelection = useCallback(
-    (id) => {
-      if (!id) return;
-      const isMedia =
-        masterMediaIds.has(id) ||
-        (selectedMasterLayout?.elements?.media ?? []).some(
-          (media) => media.id === id,
-        ) ||
-        (selectedMasterLayout?.placeholders ?? []).some(
-          (placeholder) =>
-            (placeholder.type === "image" ||
-              placeholder.type === "video") &&
-            placeholder["placeholder-id"] === id,
-        );
-      if (isMedia) {
-        masterViewDeleteMedia(id);
-      } else {
-        masterViewDeleteText(id);
-      }
+    (elementIds) => {
+      const ids = Array.isArray(elementIds) ? elementIds : [elementIds];
+      const validIds = ids.filter(Boolean);
+      if (validIds.length === 0) return;
+
+      if (validIds.length > 1) beginHistory();
+      validIds.forEach((id) => {
+        const isMedia =
+          masterMediaIds.has(id) ||
+          (selectedMasterLayout?.elements?.media ?? []).some(
+            (media) => media.id === id,
+          ) ||
+          (selectedMasterLayout?.placeholders ?? []).some(
+            (placeholder) =>
+              (placeholder.type === "image" ||
+                placeholder.type === "video") &&
+              placeholder["placeholder-id"] === id,
+          );
+        if (isMedia) {
+          masterViewDeleteMedia(id);
+        } else {
+          masterViewDeleteText(id);
+        }
+      });
+      if (validIds.length > 1) commitHistory();
     },
     [
+      beginHistory,
+      commitHistory,
       masterMediaIds,
       selectedMasterLayout,
       masterViewDeleteMedia,

@@ -18,13 +18,13 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import { createDefaultPresentation } from "../../model/defaultPresentation";
 import { addSlide } from "../../operations/slideOperations";
 import { addTextElement } from "../../operations/textOperations";
 import { addMedia } from "../../operations/mediaOperations";
-import { storeMediaFile } from "../../persistence/mediaStorage";
+import { storeMediaFile } from "../../persistence/storage/mediaStorage";
 import { exportToReveal } from "../../export/exportToReveal";
 
 describe("export pipeline integration (operations + persistence + export)", () => {

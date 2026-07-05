@@ -1,8 +1,8 @@
-import { serializePresentation } from "./serializationOperations";
-import { updateIndexEntry } from "./presentationsLibrary";
+import { serializePresentation } from "./serialization/serializationOperations";
+import { updateIndexEntry } from "./storage/presentationsLibrary";
 import { setSetting } from "./persistenceFacade";
 import { EditorEventType } from "../events/editorEvents";
-import { storageAdapter } from "./storageAdapter";
+import { storageAdapter } from "./storage/storageAdapter";
 
 const AUTOSAVE_SETTING_KEY = "autosaveEnabled";
 

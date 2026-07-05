@@ -18,7 +18,7 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import { createEventBus } from "../../events/eventBus";
 import { createInitialEditorState, editorReducer } from "../../store/editorStore";
@@ -31,9 +31,9 @@ import {
   loadPresentation,
   deletePresentation,
   presentationKey,
-} from "../../persistence/presentationsLibrary";
-import { deserializePresentation } from "../../persistence/serializationOperations";
-import { importPresentationFromJson } from "../../persistence/importPresentation";
+} from "../../persistence/storage/presentationsLibrary";
+import { deserializePresentation } from "../../persistence/serialization/serializationOperations";
+import { importPresentationFromJson } from "../../persistence/serialization/importPresentation";
 import { createDefaultPresentation } from "../../model/defaultPresentation";
 
 function createEditorHarness(storageKey) {

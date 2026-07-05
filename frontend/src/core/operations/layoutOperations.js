@@ -476,14 +476,19 @@ export const updateLayoutItem = (presentation, layoutId, itemId, updates) => {
   }
 
   const { formatting, promptText, ...rest } = updates;
-  const isTextEl = (layout.elements?.text ?? []).some((el) => el.id === itemId);
-  const isMediaEl = (layout.elements?.media ?? []).some((el) => el.id === itemId);
-  if (!isTextEl && !isMediaEl) return presentation;
-  const elementType = isTextEl ? "text" : "media";
+  const elementType = Object.entries(layout.elements ?? {}).find(
+    ([, items]) =>
+      Array.isArray(items) && items.some((element) => element.id === itemId),
+  )?.[0];
+  if (!elementType) return presentation;
   let result = presentation;
   if (Object.keys(rest).length) result = updateLayoutElement(result, layoutId, elementType, itemId, rest);
-  if (formatting) result = updateLayoutElement(result, layoutId, elementType, itemId, { formatting });
-  if (promptText !== undefined) result = updateLayoutElementTextContent(result, layoutId, itemId, promptText);
+  if (elementType === "text" && formatting) {
+    result = updateLayoutElement(result, layoutId, elementType, itemId, { formatting });
+  }
+  if (elementType === "text" && promptText !== undefined) {
+    result = updateLayoutElementTextContent(result, layoutId, itemId, promptText);
+  }
   return result;
 };
 

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { updateMasterDimensions } from "../operations/masterOperations";
+import {
+  buildLayoutPseudoSlide,
+  buildMasterPseudoSlide,
+  updateMasterDimensions,
+  updateMasterItem,
+} from "../operations/masterOperations";
 
 describe("updateMasterDimensions media scaling", () => {
   test("normalizes legacy negative crop values while resizing a presentation", () => {
@@ -90,5 +95,55 @@ describe("updateMasterDimensions media scaling", () => {
       elements: ["shape", "table"],
       position: { x: 100, y: 50 },
     });
+  });
+});
+
+describe("master z-order context", () => {
+  test("includes every supported master and layout collection", () => {
+    const masterSlide = buildMasterPseudoSlide({
+      text: [{ id: "text" }],
+      media: [{ id: "media" }],
+      shapes: [{ id: "shape" }],
+      tables: [{ id: "table" }],
+      groups: [{ id: "group" }],
+    });
+    const layoutSlide = buildLayoutPseudoSlide({
+      "layout-id": "layout",
+      placeholders: [{
+        "placeholder-id": "placeholder",
+        type: "text",
+      }],
+      elements: {
+        shapes: [{ id: "layout-shape" }],
+        tables: [{ id: "layout-table" }],
+        groups: [{ id: "layout-group" }],
+      },
+    });
+
+    expect(masterSlide.contents.shapes[0].id).toBe("shape");
+    expect(masterSlide.contents.tables[0].id).toBe("table");
+    expect(masterSlide.contents.groups[0].id).toBe("group");
+    expect(layoutSlide.contents.text[0].id).toBe("placeholder");
+    expect(layoutSlide.contents.shapes[0].id).toBe("layout-shape");
+    expect(layoutSlide.contents.tables[0].id).toBe("layout-table");
+    expect(layoutSlide.contents.groups[0].id).toBe("layout-group");
+  });
+
+  test("updates z-index in non-text master element collections", () => {
+    const presentation = {
+      slideset: {
+        master: {
+          elements: {
+            shapes: [{ id: "shape", "z-index": 1 }],
+          },
+        },
+      },
+    };
+
+    const updated = updateMasterItem(presentation, "shape", {
+      "z-index": 3,
+    });
+
+    expect(updated.slideset.master.elements.shapes[0]["z-index"]).toBe(3);
   });
 });

@@ -15,11 +15,11 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
-import { useEditorState } from "../../../hooks/useEditorState";
-import { useEditorActions } from "../../../hooks/useEditorActions";
-import { useSlides } from "../../../hooks/useSlides";
+import { useEditorState } from "../../../hooks/editor/useEditorState";
+import { useEditorActions } from "../../../hooks/editor/useEditorActions";
+import { useSlides } from "../../../hooks/editor/useSlides";
 
 function useComposedEditor(presentationId) {
   const { state, eventBus, isLoading } = useEditorState(presentationId);

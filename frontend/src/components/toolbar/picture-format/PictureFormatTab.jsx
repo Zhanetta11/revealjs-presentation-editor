@@ -41,6 +41,10 @@ import { createPortal } from "react-dom";
 import ImageStylePicker from "../../canvas/media/ImageStylePicker";
 import AltTextPanel from "./AltTextPanel";
 import { IMAGE_STYLES } from "../../../core/model/imageStyles";
+import {
+  DEFAULT_VIDEO_PREVIEW_SRC,
+  getVideoPosterReference,
+} from "../../../core/render/mediaPreview";
 import "./PictureFormatTab.css";
 
 const SVG_PREVIEW = `data:image/svg+xml,${encodeURIComponent(
@@ -1004,6 +1008,7 @@ function ArtisticPopover({ src, effects, onUpdate, anchorRect }) {
 
 export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForward, onSendBackward, onChangePicture, onPreviewEffects, onPreviewStyle, onBeginHistory, onCommitHistory, isSlideMasterOpen = false, showAltText = false, onToggleAltText }) {
   const resolvedSrc = useMediaSrc(media?.["file-link"]);
+  const resolvedVideoPoster = useMediaSrc(getVideoPosterReference(media));
   const [openPopover, setOpenPopover] = useState(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState(null);
   const [showAltPanelMaster, setShowAltPanelMaster] = useState(false);
@@ -1012,15 +1017,21 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
     if (isSlideMasterOpen) setShowAltPanelMaster((v) => !v);
     else onToggleAltText?.();
   };
-  const closeAltPanel = () => {
+  const closeAltPanel = useCallback(() => {
     if (isSlideMasterOpen) setShowAltPanelMaster(false);
     else onToggleAltText?.(false);
-  };
+  }, [isSlideMasterOpen, onToggleAltText]);
   const isImage = media?.["media-type"] !== "video";
+  const previewSrc = isImage
+    ? resolvedSrc
+    : resolvedVideoPoster ?? DEFAULT_VIDEO_PREVIEW_SRC;
+  const stylePreviewSrc = isImage ? SVG_PREVIEW : previewSrc;
 
   useEffect(() => {
-    if (!isImage && showAltPanel) closeAltPanel();
-  }, [isImage]);
+    if (isImage || !showAltPanel) return undefined;
+    const timeoutId = window.setTimeout(closeAltPanel, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [closeAltPanel, isImage, showAltPanel]);
   const changeInputRef = useRef(null);
   const [stylePickerPos, setStylePickerPos] = useState(null);
   const [galleryPage, setGalleryPage] = useState(0);
@@ -1099,7 +1110,7 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
             </button>
             {openPopover === "brightness" && (
               <CorrectionsPopover
-                src={resolvedSrc}
+                src={previewSrc}
                 effects={effects}
                 onUpdate={onUpdate}
                 anchorRect={popoverAnchorRect}
@@ -1115,7 +1126,7 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
             </button>
             {openPopover === "color" && (
               <ColorPopover
-                src={resolvedSrc}
+                src={previewSrc}
                 effects={effects}
                 onUpdate={onUpdate}
                 anchorRect={popoverAnchorRect}
@@ -1129,7 +1140,7 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
             </button>
             {openPopover === "artistic" && (
               <ArtisticPopover
-                src={resolvedSrc}
+                src={previewSrc}
                 effects={effects}
                 onUpdate={onUpdate}
                 anchorRect={popoverAnchorRect}
@@ -1143,7 +1154,7 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
             </button>
             {openPopover === "opacity" && (
               <TransparencyPopover
-                src={resolvedSrc}
+                src={previewSrc}
                 opacity={opacity}
                 onUpdate={onUpdate}
                 anchorRect={popoverAnchorRect}
@@ -1208,7 +1219,23 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
                   onMouseEnter={() => onPreviewStyle?.(s.id)}
                   onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onPreviewStyle?.(null); onUpdate({ effects: { ...effects, "style-id": s.id } }); }}
                 >
-                  <img src={SVG_PREVIEW} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", ...s.css }} />
+                  <img
+                    src={stylePreviewSrc}
+                    alt={isImage ? "" : "Video preview"}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", ...s.css }}
+                    onError={
+                      isImage
+                        ? undefined
+                        : (event) => {
+                            event.currentTarget.src = DEFAULT_VIDEO_PREVIEW_SRC;
+                          }
+                    }
+                  />
+                  {!isImage && (
+                    <span className="pft-video-preview-badge" aria-hidden="true">
+                      ▶
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1235,6 +1262,7 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
         </div>
         {openPopover === "style" && stylePickerPos && (
           <ImageStylePicker
+            media={media}
             position={stylePickerPos}
             currentStyleId={currentStyleId}
             onPreview={(id) => onPreviewStyle?.(id)}
@@ -1270,7 +1298,7 @@ export default function PictureFormatTab({ media, onUpdate, onCrop, onBringForwa
           </button>
           {openPopover === "fx" && (
             <PictureEffectsPopover
-              src={resolvedSrc}
+              src={previewSrc}
               effects={effects}
               onUpdate={onUpdate}
               onClose={() => setOpenPopover(null)}

@@ -21,13 +21,14 @@ import { getElementLabel } from "../../core/operations/elementOperations";
 import { getPresentationTitle } from "../../core/utils/presentationUtils";
 import { getSlideTransition } from "../../core/model/transitionDefaults";
 import { isElectron, getElectronAPI } from "../../core/platform/electron";
-import { isQuotaExceededError } from "../../core/persistence/storageErrors";
+import { isQuotaExceededError } from "../../core/persistence/storage/storageErrors";
 import { createTextElementDefaults } from "../../core/model/masterDefaults";
 import { createLayoutPlaceholder } from "../../core/model/defaultLayouts";
 import { updateThemeBackground } from "../../core/model/designThemes";
 import { clampSlideDimension } from "../../core/model/slideSizes";
 import { toHex9 } from "../../core/utils/colorUtils";
 import { getLayoutDisplayList } from "../../core/operations/layoutOperations";
+import { canCopyOrCutEditorSelection } from "./editorControllerHelpers";
 
 export function useEditorController() {
   const { presentationId } = useParams();
@@ -40,6 +41,7 @@ export function useEditorController() {
   const [isSlideMasterOpen, setIsSlideMasterOpen] = useState(false);
   const [masterName, setMasterName] = useState("Office Theme");
   const [selectedMasterElementId, setSelectedMasterElementId] = useState(null);
+  const [selectedMasterElementIds, setSelectedMasterElementIds] = useState([]);
   const [selectedMasterLayoutId, setSelectedMasterLayoutId] = useState(null);
   const [findReplaceMode, setFindReplaceMode] = useState("find");
 
@@ -482,12 +484,22 @@ export function useEditorController() {
     undo,
     redo,
   });
+  const isEditingSelectedText =
+    selectedTextEl?.id === selectedElementId &&
+    editingTextElementId === selectedElementId;
+  const canCopyCut = canCopyOrCutEditorSelection({
+    hasRealTextSelection: hasRealSelection,
+    selectedElementCount: selectedElementsRaw.length,
+    isEditingSelectedText,
+    objectSelectionMode,
+  });
   const {
     handleCopy,
     handleCut,
     handlePaste,
     handlePasteText,
     handlePastePicture,
+    canPaste,
   } = useEditorClipboard({
     selectedSlide,
     selectedElementId,
@@ -498,6 +510,7 @@ export function useEditorController() {
     clipboard: state.clipboard,
     currentFormatting,
     activeSelectionRef,
+    editingTextElementId,
     setActiveSelection,
     setPendingFormatting,
     updateTextElementParagraphs,
@@ -851,6 +864,7 @@ export function useEditorController() {
     selectedMasterLayoutId,
     selectedMasterLayout,
     selectedMasterElementId,
+    selectedMasterElementIds,
     masterTextIds,
     masterMediaIds,
     beginHistory,
@@ -1006,7 +1020,35 @@ export function useEditorController() {
       ) {
         clearTextEditingState();
       }
-      setSelectedMasterElementId(elementId);
+      if (!elementId) {
+        setSelectedMasterElementId(null);
+        setSelectedMasterElementIds([]);
+        return;
+      }
+
+      const toggle = Boolean(
+        options?.toggle ||
+          event?.ctrlKey ||
+          event?.metaKey ||
+          event?.shiftKey,
+      );
+      if (!toggle) {
+        setSelectedMasterElementId(elementId);
+        setSelectedMasterElementIds([elementId]);
+        return;
+      }
+
+      setSelectedMasterElementIds((currentIds) => {
+        if (currentIds.includes(elementId)) {
+          const nextIds = currentIds.filter((id) => id !== elementId);
+          setSelectedMasterElementId(
+            nextIds.length > 0 ? nextIds[nextIds.length - 1] : null,
+          );
+          return nextIds;
+        }
+        setSelectedMasterElementId(elementId);
+        return [...currentIds, elementId];
+      });
     },
     [clearTextEditingState, selectedMasterElementId],
   );
@@ -1085,6 +1127,7 @@ export function useEditorController() {
     masterName,
     setMasterName,
     selectedMasterElementId,
+    selectedMasterElementIds,
     setSelectedMasterElementId,
     handleMasterElementSelect,
     selectedMasterLayoutId,
@@ -1120,6 +1163,8 @@ export function useEditorController() {
     handlePaste,
     handlePasteText,
     handlePastePicture,
+    canCopyCut,
+    canPaste,
     handlePlaceholderImageUpload,
     handlePlaceholderVideoUpload,
     handleDeleteSelection,

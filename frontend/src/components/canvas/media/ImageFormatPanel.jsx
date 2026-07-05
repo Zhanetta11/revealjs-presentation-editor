@@ -179,7 +179,7 @@ function ArtisticPopover({ currentEffect, onChange, onClose }) {
 }
 
 export default function ImageFormatPanel({ media, position, onUpdate, onCrop, onBringForward, onSendBackward, onBeginHistory, onCommitHistory }) {
-  const [openPopover, setOpenPopover] = useState(null); // "brightness" | "opacity" | "color" | "style" | "artistic"
+  const [openPopover, setOpenPopover] = useState(null);
   const [stylePickerPos, setStylePickerPos] = useState(null);
   const [lockedRatio, setLockedRatio] = useState(true);
   const [sizeDraft, setSizeDraft] = useState(() => ({
@@ -346,6 +346,7 @@ export default function ImageFormatPanel({ media, position, onUpdate, onCrop, on
           onClick={openStylePicker} />
         {openPopover === "style" && stylePickerPos && (
           <ImageStylePicker
+            media={media}
             position={stylePickerPos}
             currentStyleId={currentStyleId}
             onSelect={(id) => onUpdate({ effects: { ...effects, "style-id": id } })}

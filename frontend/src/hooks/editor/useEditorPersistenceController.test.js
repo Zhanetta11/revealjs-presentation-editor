@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   isElectron: vi.fn(() => false),
   supportsFileSystemAccess: vi.fn(() => false),
   chooseElectronProjectFolder: vi.fn(),
+  linkBrowserProjectFolder: vi.fn(),
+  openBrowserProjectFolderFromPicker: vi.fn(),
   saveBrowserProjectSnapshot: vi.fn(),
   writeAndCommitElectronProjectSnapshot: vi.fn(),
   createCommittingSource: vi.fn((id, folder = null) => ({
@@ -53,6 +55,8 @@ vi.mock("../../core/persistence/persistenceFacade", () => ({
   deletePresentation: mocks.deletePresentation,
   downloadPresentationAsJson: vi.fn(),
   getPresentationSource: mocks.getPresentationSource,
+  linkBrowserProjectFolder: mocks.linkBrowserProjectFolder,
+  openBrowserProjectFolderFromPicker: mocks.openBrowserProjectFolderFromPicker,
   openElectronProjectFolder: vi.fn(),
   saveBrowserProjectSnapshot: mocks.saveBrowserProjectSnapshot,
   writeAndCommitElectronProjectSnapshot: mocks.writeAndCommitElectronProjectSnapshot,

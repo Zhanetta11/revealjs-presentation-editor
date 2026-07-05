@@ -39,6 +39,7 @@ export default function EditorPage() {
         onGoHome={() => navigate("/")}
         onNew={ctrl.handleNew}
         onOpen={ctrl.handleElectronOpen}
+        onOpenProjectFolder={ctrl.handleOpenProjectFolder}
         onOpenProject={ctrl.handleOpenRecentProject}
         onSave={ctrl.handleSave}
         onSaveAs={ctrl.handleSaveAs}

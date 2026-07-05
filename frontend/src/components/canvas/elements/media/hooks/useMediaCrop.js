@@ -73,7 +73,7 @@ export default function useMediaCrop({
   }, [cropOrigin, isCropping, wrapperRef]);
 
   const enterCropMode = useCallback(() => {
-    const { fullX, fullY, srcW, srcH, initialCrop } = computeCropOrigin({
+    const { initialCrop, ...origin } = computeCropOrigin({
       crop: mediaCrop,
       width: mediaWidth,
       height: mediaHeight,
@@ -84,7 +84,7 @@ export default function useMediaCrop({
       "source-width": sourceWidth,
       "source-height": sourceHeight,
     });
-    setCropOrigin({ fullX, fullY, srcW, srcH });
+    setCropOrigin(origin);
     setLocalCrop(initialCrop);
     setIsCropping(true);
   }, [

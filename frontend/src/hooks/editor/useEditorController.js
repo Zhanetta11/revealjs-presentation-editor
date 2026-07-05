@@ -809,6 +809,7 @@ export function useEditorController() {
     handleNew,
     handleOpenRecentProject,
     handleElectronOpen,
+    handleOpenProjectFolder,
     handleLoadFile,
     handleDeleteAndGoHome,
   } = useEditorPersistenceController({
@@ -1177,6 +1178,7 @@ export function useEditorController() {
     handleNew,
     handleOpenRecentProject,
     handleElectronOpen,
+    handleOpenProjectFolder,
     handleLoadFile,
     handleDeleteAndGoHome,
     handleFormatChange,

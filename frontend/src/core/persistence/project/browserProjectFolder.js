@@ -59,6 +59,22 @@ async function chooseNewProjectFolder(presentationTitle) {
   return { folderHandle, folderName };
 }
 
+async function chooseExistingProjectFolder() {
+  let folderHandle;
+  try {
+    folderHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+  } catch (e) {
+    if (e?.name === "AbortError") return null;
+    throw e;
+  }
+
+  if (!(await verifyPermission(folderHandle, "readwrite"))) {
+    throw new Error("Permission to access this project folder was denied.");
+  }
+
+  return folderHandle;
+}
+
 async function writeFileToFolder(folderHandle, relativePath, content) {
   const segments = relativePath.split("/");
   let dir = folderHandle;
@@ -230,6 +246,48 @@ export async function loadBrowserLinkedProjectSnapshot(presentationId) {
   return { jsonText, projectFolder: folderHandle.name };
 }
 
+export async function openBrowserProjectFolderFromPicker() {
+  const folderHandle = await chooseExistingProjectFolder();
+  if (!folderHandle) return null;
+
+  let fileHandle;
+  try {
+    fileHandle = await folderHandle.getFileHandle("presentation.json");
+  } catch {
+    throw new Error(
+      "The selected folder is not a presentation project. It must contain presentation.json.",
+    );
+  }
+
+  const file = await fileHandle.getFile();
+  const manifestText = await file.text();
+  JSON.parse(manifestText);
+  const jsonText = await rehydrateProjectManifestJson(
+    manifestText,
+    (relativePath) => readFileFromFolder(folderHandle, relativePath),
+    {
+      cacheKeyForPath: (relativePath) =>
+        `media/browser-project-open-${folderHandle.name}-${relativePath.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
+    },
+  );
+  const parsed = JSON.parse(manifestText);
+  const title =
+    parsed?.slideset?.title
+    ?? parsed?.slideset?.filename
+    ?? folderHandle.name;
+  const recentId = await recentProjectsStore.upsert({
+    handle: folderHandle,
+    title,
+  });
+
+  return {
+    jsonText,
+    projectFolder: folderHandle.name,
+    folderHandle,
+    recentId,
+  };
+}
+
 // Non-prompting: reports whether a linked folder exists and whether write
 // permission is currently granted. A linked handle whose permission lapsed is
 // still a valid project — callers must not treat it as "no folder".
@@ -281,6 +339,12 @@ export async function linkBrowserRecentProject(presentationId, recentId) {
   const entry = await recentProjectsStore.get(recentId);
   if (!entry) throw new Error("This project is not in the recent list.");
   await linkedFolderStore.set(presentationId, entry.handle);
+}
+
+export async function linkBrowserProjectFolder(presentationId, folderHandle) {
+  if (!presentationId) throw new Error("Missing presentation id.");
+  if (!folderHandle) throw new Error("Missing project folder handle.");
+  await linkedFolderStore.set(presentationId, folderHandle);
 }
 
 export async function isBrowserRecentProjectLinkedToPresentation(

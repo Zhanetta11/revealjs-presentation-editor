@@ -80,6 +80,8 @@ export default function TextElement({
   onPlaceholderVideoClick,
   placeholderActionsDisabled = false,
   onNavigateToSlide,
+  activeParagraphIndex = null,
+  activeEffect = null,
 }) {
   const editableRef = useRef(null);
   const elementRef = useRef(null);
@@ -284,6 +286,36 @@ export default function TextElement({
       }
     }
   }, [innerHTML, savedSelectionRef, textElement.paragraphs]);
+
+  useEffect(() => {
+    const editable = editableRef.current;
+    if (!editable || !activeEffect) return undefined;
+
+    const paragraphNodes = Array.from(
+      editable.querySelectorAll("[data-paragraph-index]"),
+    );
+    const effectClass = `play-${activeEffect}`;
+
+    paragraphNodes.forEach((node, index) => {
+      if (activeParagraphIndex === null || index > activeParagraphIndex) {
+        node.style.visibility = "hidden";
+        node.classList.remove("play-effect", effectClass);
+      } else if (index === activeParagraphIndex) {
+        node.style.visibility = "";
+        node.classList.add("play-effect", effectClass);
+      } else {
+        node.style.visibility = "";
+        node.classList.remove("play-effect", effectClass);
+      }
+    });
+
+    return () => {
+      paragraphNodes.forEach((node) => {
+        node.style.visibility = "";
+        node.classList.remove("play-effect", effectClass);
+      });
+    };
+  }, [activeParagraphIndex, activeEffect]);
 
   const wasPrimarySelectedRef = useRef(isPrimarySelected);
   useEffect(() => {

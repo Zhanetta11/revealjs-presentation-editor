@@ -517,6 +517,7 @@ export function useEditorController() {
         ? {
             id: selectedElementRaw.id,
             label: getElementLabel(selectedElementRaw),
+            paragraphCount: selectedElementRaw.paragraphs?.length ?? 1,
           }
         : null,
     [selectedElementRaw],

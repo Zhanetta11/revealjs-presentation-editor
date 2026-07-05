@@ -52,9 +52,11 @@ export {
   writeAndCommitElectronProjectSnapshot,
 } from "./project/electronProjectFolder";
 export {
+  openBrowserProjectFolderFromPicker,
   saveBrowserProjectSnapshot,
   writeBrowserProjectSnapshot,
   loadBrowserLinkedProjectSnapshot,
+  linkBrowserProjectFolder,
 } from "./project/browserProjectFolder";
 
 const localStorageSettings = {

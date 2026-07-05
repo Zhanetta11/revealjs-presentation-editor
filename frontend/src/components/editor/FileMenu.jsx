@@ -26,6 +26,7 @@ export default function FileMenu({
   onClosePresentation,
   onNew,
   onOpen,
+  onOpenProjectFolder,
   onOpenProject,
   onSave,
   onSaveAs,
@@ -51,6 +52,23 @@ export default function FileMenu({
     }
   };
 
+  const handleOpenProjectFolder = async () => {
+    const opened = await (onOpenProjectFolder ?? onOpen)?.();
+    if (opened) onClose?.();
+  };
+
+  const handleImportJson = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleOpen = () => {
+    if (usesProjectFolders()) {
+      handleOpenProjectFolder();
+      return;
+    }
+    handleImportJson();
+  };
+
   const handleNav = (item) => {
     if (item === "Close") { onClosePresentation?.(); return; }
     if (item === "Save") { onSave(); onClose(); return; }
@@ -58,14 +76,6 @@ export default function FileMenu({
     if (item === "Export ZIP") { onExportZip?.(); onClose(); return; }
     if (item === "Open") { handleOpen(); return; }
     setActiveItem(item);
-  };
-
-  const handleOpen = async () => {
-    if (isElectron()) {
-      await onOpen?.();
-      return;
-    }
-    fileInputRef.current?.click();
   };
 
   const handleFileChange = (e) => {

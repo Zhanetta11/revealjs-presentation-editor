@@ -6,12 +6,14 @@ const {
   recentUpsert,
   recentGet,
   getMediaFile,
+  storeMediaFileAtKey,
 } = vi.hoisted(() => ({
   linkedFolderGet: vi.fn(),
   linkedFolderSet: vi.fn(),
   recentUpsert: vi.fn(),
   recentGet: vi.fn(),
   getMediaFile: vi.fn(),
+  storeMediaFileAtKey: vi.fn(),
 }));
 
 vi.mock("../persistence/project/browserProjectDb", () => ({
@@ -30,11 +32,13 @@ vi.mock("../persistence/project/browserProjectDb", () => ({
 vi.mock("../persistence/storage/mediaStorage", () => ({
   getMediaFile,
   storeMediaFile: vi.fn(),
-  storeMediaFileAtKey: vi.fn(),
+  storeMediaFileAtKey,
 }));
 
 import {
+  linkBrowserProjectFolder,
   linkBrowserRecentProject,
+  openBrowserProjectFolderFromPicker,
   openBrowserRecentProject,
   saveBrowserProjectSnapshot,
   writeBrowserProjectSnapshot,
@@ -138,9 +142,11 @@ describe("Browser project-folder persistence sink", () => {
     recentUpsert.mockReset();
     recentGet.mockReset();
     getMediaFile.mockReset();
+    storeMediaFileAtKey.mockReset();
     getMediaFile.mockResolvedValue(
       new Blob(["image"], { type: "image/png" }),
     );
+    storeMediaFileAtKey.mockImplementation(async (key) => ({ key }));
     delete window.showDirectoryPicker;
   });
 
@@ -245,6 +251,40 @@ describe("Browser project-folder persistence sink", () => {
     );
     expect(linkedFolderSet).toHaveBeenCalledWith(
       "opened-project-id",
+      project.handle,
+    );
+  });
+
+  test("Open Project Folder reads presentation.json, rehydrates media, and exposes the folder handle for linking", async () => {
+    const project = createMemoryFolder("Picked Project");
+    const presentation = createPresentation("Picked Project");
+    presentation.slideset.slides[0].contents.media[0]["file-link"] =
+      "media/image/picked.png";
+    project.files.set("presentation.json", JSON.stringify(presentation));
+    project.files.set("media/image/picked.png", new Uint8Array([1, 2, 3]));
+    window.showDirectoryPicker = vi.fn(async () => project.handle);
+    recentUpsert.mockResolvedValue("recent-picked");
+
+    const opened = await openBrowserProjectFolderFromPicker();
+    await linkBrowserProjectFolder("picked-id", opened.folderHandle);
+
+    const parsed = JSON.parse(opened.jsonText);
+    expect(window.showDirectoryPicker).toHaveBeenCalledWith({
+      mode: "readwrite",
+    });
+    expect(project.handle.queryPermission).toHaveBeenCalledWith({
+      mode: "readwrite",
+    });
+    expect(opened.projectFolder).toBe("Picked Project");
+    expect(opened.recentId).toBe("recent-picked");
+    expect(parsed.slideset.slides[0].contents.media[0]["file-link"])
+      .toContain("media/browser-project-open-Picked Project-media_image_picked.png");
+    expect(recentUpsert).toHaveBeenCalledWith({
+      handle: project.handle,
+      title: "Picked Project",
+    });
+    expect(linkedFolderSet).toHaveBeenCalledWith(
+      "picked-id",
       project.handle,
     );
   });

@@ -7,6 +7,7 @@ import {
 } from "../model/mediaCrop";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
 export { clampCrop, clampCropEdges, clampCropPan };
 
@@ -153,10 +154,11 @@ export const updateMedia = (presentation, slideIndex, mediaId, updates) => {
       media: (slide.contents?.media ?? []).map((media) => {
         if (media.id !== mediaId) return media;
         const next = { ...media, ...updates };
+        const isExplicitCropUpdate = hasOwn(updates, "crop");
         const isResize =
           ("width" in updates && updates.width !== media.width)
           || ("height" in updates && updates.height !== media.height);
-        if (isResize && "source-width" in media) {
+        if (isResize && "source-width" in media && !isExplicitCropUpdate) {
           const hasCrop = (media.crop ?? []).some((v) => v !== 0);
           if (hasCrop) {
             const scaleX = media.width > 0 ? next.width / media.width : 1;

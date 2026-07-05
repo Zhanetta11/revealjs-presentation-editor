@@ -52,8 +52,6 @@ export const createProjectSource = (
   projectFolder,
   status: PresentationSourceStatus.PROJECT,
   platform: normalizeSourcePlatform(platform),
-  // Runtime-only flag (never persisted to the presentation JSON): the browser
-  // project link exists but the folder handle needs a fresh permission grant.
   permissionRequired,
 });
 
@@ -98,8 +96,6 @@ export async function getPresentationSource(presentationId) {
   }
   if (supportsFileSystemAccess()) {
     const linked = await getBrowserLinkedFolder(presentationId);
-    // A linked folder makes this a browser project regardless of whether
-    // permission is currently granted; only a missing link is a draft.
     return linked
       ? createProjectSource(
           presentationId,

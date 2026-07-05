@@ -23,9 +23,9 @@ const { records, storageAdapter, linkedFolders, recentProjects } = vi.hoisted(()
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
-vi.mock("../../persistence/browserProjectDb", () => ({
+vi.mock("../../persistence/project/browserProjectDb", () => ({
   linkedFolderStore: {
     get: async (id) => linkedFolders.get(id) ?? null,
     set: async (id, handle) => {
@@ -65,8 +65,8 @@ import {
 } from "../../../hooks/useProjectLibrary";
 import { createDefaultPresentation } from "../../model/defaultPresentation";
 import { addMedia } from "../../operations/mediaOperations";
-import { serializePresentation } from "../../persistence/serializationOperations";
-import { loadPresentation } from "../../persistence/presentationsLibrary";
+import { serializePresentation } from "../../persistence/serialization/serializationOperations";
+import { loadPresentation } from "../../persistence/storage/presentationsLibrary";
 
 function createFakeFolderHandle(name, files) {
   const makeDir = (prefix, dirName) => ({

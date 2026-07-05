@@ -14,7 +14,7 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import {
   editorReducer,

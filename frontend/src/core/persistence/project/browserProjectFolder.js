@@ -127,8 +127,11 @@ async function getWritableLinkedFolder(presentationId) {
   if (!folderHandle) {
     throw new Error("The presentation is not linked to a browser project folder.");
   }
-  const permission = await folderHandle.queryPermission({ mode: "readwrite" });
-  if (permission !== "granted") {
+  // Request permission on the existing handle. With a user gesture (explicit
+  // Save) this prompts; without one (autosave) requestPermission resolves to
+  // the current state without a dialog, so autosave errors rather than falling
+  // back to the draft cache.
+  if (!(await verifyPermission(folderHandle))) {
     throw new Error("Write permission for the browser project folder is unavailable.");
   }
   return folderHandle;
@@ -138,8 +141,13 @@ export async function saveProjectToBrowserFolder({ presentationId, presentationT
   if (!presentationId) throw new Error("Missing presentation id.");
 
   let folderHandle = forceNewFolder ? null : await linkedFolderStore.get(presentationId);
+  // A linked project exists: request permission on that same folder. If the
+  // user denies it, keep the project identity and surface an error instead of
+  // silently opening a folder picker (which would spawn a second project).
   if (folderHandle && !(await verifyPermission(folderHandle))) {
-    folderHandle = null;
+    throw new Error(
+      "Write permission for the project folder was denied. The presentation is still linked to that folder.",
+    );
   }
 
   let folderName;
@@ -222,11 +230,20 @@ export async function loadBrowserLinkedProjectSnapshot(presentationId) {
   return { jsonText, projectFolder: folderHandle.name };
 }
 
-export async function getBrowserLinkedFolderName(presentationId) {
+// Non-prompting: reports whether a linked folder exists and whether write
+// permission is currently granted. A linked handle whose permission lapsed is
+// still a valid project — callers must not treat it as "no folder".
+export async function getBrowserLinkedFolder(presentationId) {
   const handle = await linkedFolderStore.get(presentationId);
   if (!handle) return null;
-  const granted = (await handle.queryPermission({ mode: "readwrite" })) === "granted";
-  return granted ? handle.name : null;
+  const granted =
+    (await handle.queryPermission({ mode: "readwrite" })) === "granted";
+  return { name: handle.name, granted };
+}
+
+export async function getBrowserLinkedFolderName(presentationId) {
+  const info = await getBrowserLinkedFolder(presentationId);
+  return info?.granted ? info.name : null;
 }
 
 export async function getBrowserLinkedPresentationIds() {

@@ -210,8 +210,11 @@ export function useEditorPersistenceController({
 
   const handleSaveAs = useCallback(async () => {
     if (isElectron()) {
-      const result = await savePresentation();
-      if (!result.success) return;
+      // Save As must not touch the old project. Do NOT call savePresentation()
+      // first (that would write current edits into the current project sink).
+      // saveProjectToFolder(true) builds directly from the in-memory snapshot,
+      // commits to the newly chosen folder, and only then switches the source;
+      // a cancel or commit failure leaves the old project untouched.
       try {
         await saveProjectToFolder(true);
       } catch (error) {
@@ -274,7 +277,6 @@ export function useEditorPersistenceController({
     }
   }, [
     presentation,
-    savePresentation,
     saveProjectToFolder,
     canUseProjectFolders,
     promptForPresentationName,

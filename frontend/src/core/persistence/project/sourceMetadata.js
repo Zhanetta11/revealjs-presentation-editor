@@ -1,6 +1,6 @@
 import { isElectron, getElectronAPI } from "../../platform/electron";
 import { supportsFileSystemAccess } from "../../platform/fileSystemAccess";
-import { getBrowserLinkedFolderName } from "./browserProjectFolder";
+import { getBrowserLinkedFolder } from "./browserProjectFolder";
 
 export const PresentationSourceKind = Object.freeze({
   DRAFT: "draft",
@@ -45,12 +45,16 @@ export const createProjectSource = (
   presentationId,
   projectFolder,
   platform = currentSourcePlatform(),
+  { permissionRequired = false } = {},
 ) => ({
   kind: PresentationSourceKind.PROJECT,
   presentationId,
   projectFolder,
   status: PresentationSourceStatus.PROJECT,
   platform: normalizeSourcePlatform(platform),
+  // Runtime-only flag (never persisted to the presentation JSON): the browser
+  // project link exists but the folder handle needs a fresh permission grant.
+  permissionRequired,
 });
 
 export const createCommittingSource = (
@@ -93,9 +97,16 @@ export async function getPresentationSource(presentationId) {
     return normalizePresentationSource(source, presentationId);
   }
   if (supportsFileSystemAccess()) {
-    const projectFolder = await getBrowserLinkedFolderName(presentationId);
-    return projectFolder
-      ? createProjectSource(presentationId, projectFolder)
+    const linked = await getBrowserLinkedFolder(presentationId);
+    // A linked folder makes this a browser project regardless of whether
+    // permission is currently granted; only a missing link is a draft.
+    return linked
+      ? createProjectSource(
+          presentationId,
+          linked.name,
+          PresentationSourcePlatform.BROWSER,
+          { permissionRequired: !linked.granted },
+        )
       : createDraftSource(presentationId);
   }
   return createDraftSource(presentationId);

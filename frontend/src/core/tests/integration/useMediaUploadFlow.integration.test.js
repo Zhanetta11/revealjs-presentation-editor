@@ -17,10 +17,10 @@ const { records, storageAdapter } = vi.hoisted(() => {
 
 vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
 
-import { useEditorState } from "../../../hooks/useEditorState";
-import { useEditorActions } from "../../../hooks/useEditorActions";
-import { useSlides } from "../../../hooks/useSlides";
-import { useMediaUpload } from "../../../hooks/useMediaUpload";
+import { useEditorState } from "../../../hooks/editor/useEditorState";
+import { useEditorActions } from "../../../hooks/editor/useEditorActions";
+import { useSlides } from "../../../hooks/editor/useSlides";
+import { useMediaUpload } from "../../../hooks/media/useMediaUpload";
 
 class FakeImage {
   set src(value) {

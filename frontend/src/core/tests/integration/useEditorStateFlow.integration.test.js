@@ -21,7 +21,7 @@ const { records, storageAdapter } = vi.hoisted(() => {
 
 vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
 
-import { useEditorState } from "../../../hooks/useEditorState";
+import { useEditorState } from "../../../hooks/editor/useEditorState";
 import { EditorEventType, createEditorEvent } from "../../events/editorEvents";
 import { createDefaultPresentation } from "../../model/defaultPresentation";
 import {

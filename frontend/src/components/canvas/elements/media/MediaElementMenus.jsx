@@ -27,6 +27,7 @@ export default function MediaElementMenus({
 
       {stylePicker && (
         <ImageStylePicker
+          media={media}
           position={stylePicker}
           currentStyleId={media.effects?.["style-id"]}
           onPreview={onPreviewStyle}

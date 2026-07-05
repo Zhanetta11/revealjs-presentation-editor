@@ -1,5 +1,5 @@
 import { storageAdapter } from "./storageAdapter";
-import { serializePresentation } from "./serializationOperations";
+import { serializePresentation } from "../serialization/serializationOperations";
 
 const INDEX_KEY = "presentations_index";
 

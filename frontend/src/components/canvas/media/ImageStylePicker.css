@@ -59,3 +59,22 @@
   display: block;
   pointer-events: none;
 }
+
+.image-style-picker__video-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding-left: 1px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 7px;
+  line-height: 1;
+  pointer-events: none;
+}

@@ -1,6 +1,6 @@
 import { createDefaultPresentation } from "../model/defaultPresentation";
 import { EditorEventType } from "../events/editorEvents";
-import { deserializePresentation } from "../persistence/serializationOperations";
+import { deserializePresentation } from "../persistence/serialization/serializationOperations";
 
 import {
   resizeElement,
@@ -762,13 +762,23 @@ export const editorReducer = (state, event) => {
         updatesById.has(element.id)
           ? { ...element, ...updatesById.get(element.id) }
           : element;
+      const elementCollections = [
+        "text",
+        "media",
+        "shapes",
+        "tables",
+        "groups",
+      ];
+      const updatedContents = { ...slide.contents };
+      elementCollections.forEach((collection) => {
+        if (Array.isArray(slide.contents?.[collection])) {
+          updatedContents[collection] =
+            slide.contents[collection].map(applyUpdates);
+        }
+      });
       slides[state.selectedSlideIndex] = {
         ...slide,
-        contents: {
-          ...slide.contents,
-          text: (slide.contents?.text ?? []).map(applyUpdates),
-          media: (slide.contents?.media ?? []).map(applyUpdates),
-        },
+        contents: updatedContents,
       };
       return withHistory(state, {
         ...state,

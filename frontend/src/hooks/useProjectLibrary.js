@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getIndex,
   getProjectPresentationSources,
+  loadElectronProjectSnapshot,
   openElectronProjectFolder,
 } from "../core/persistence/persistenceFacade";
-import { importPresentationFromJson } from "../core/persistence/importPresentation";
+import { importPresentationFromJson } from "../core/persistence/serialization/importPresentation";
 import { isElectron, getElectronAPI } from "../core/platform/electron";
 import { supportsFileSystemAccess } from "../core/platform/fileSystemAccess";
 import {
@@ -12,10 +13,11 @@ import {
   getBrowserLinkedPresentationIds,
   openBrowserRecentProject,
   linkBrowserRecentProject,
+  isBrowserRecentProjectLinkedToPresentation,
   removeBrowserRecentProject,
   readMediaFileFromRecent,
-} from "../core/persistence/browserProjectFolder";
-import { rehydrateProjectManifestJson } from "../core/persistence/projectMediaRehydrate";
+} from "../core/persistence/project/browserProjectFolder";
+import { rehydrateProjectManifestJson } from "../core/persistence/project/projectMediaRehydrate";
 
 export const usesProjectFolders = () => isElectron() || supportsFileSystemAccess();
 
@@ -52,7 +54,8 @@ export function useProjectLibrary() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    const timeoutId = window.setTimeout(refresh, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [refresh]);
 
   const draftPresentations = usesProjectFolders()
@@ -62,17 +65,48 @@ export function useProjectLibrary() {
   return { presentations, recentProjects, draftPresentations, refresh };
 }
 
-export async function openRecentProject(key) {
+export async function openRecentProject(key, { asDraftCopy = false } = {}) {
   if (isElectron()) {
+    if (asDraftCopy) {
+      const { jsonText } = await loadElectronProjectSnapshot(key);
+      return importPresentationFromJson(jsonText);
+    }
     const { presentationId } = await openElectronProjectFolder(key);
     return presentationId;
   }
-  const jsonText = await openBrowserRecentProject(key);
+  const jsonText = await openBrowserRecentProject(key, {
+    writable: !asDraftCopy,
+  });
   const readFile = (relativePath) => readMediaFileFromRecent(key, relativePath);
   const rehydratedJsonText = await rehydrateProjectManifestJson(jsonText, readFile);
   const id = await importPresentationFromJson(rehydratedJsonText);
-  await linkBrowserRecentProject(id, key);
+  if (!asDraftCopy) await linkBrowserRecentProject(id, key);
   return id;
+}
+
+const normalizeProjectFolder = (value) =>
+  typeof value === "string"
+    ? value.replace(/\\/g, "/").replace(/\/+$/, "")
+    : "";
+
+export async function isRecentProjectCurrentSource(
+  key,
+  presentationId,
+  presentationSource,
+) {
+  if (
+    presentationSource?.kind !== "project" ||
+    !presentationSource.projectFolder
+  ) {
+    return false;
+  }
+  if (isElectron()) {
+    return (
+      normalizeProjectFolder(key) ===
+      normalizeProjectFolder(presentationSource.projectFolder)
+    );
+  }
+  return isBrowserRecentProjectLinkedToPresentation(presentationId, key);
 }
 
 export async function removeRecentProject(key) {

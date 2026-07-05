@@ -1,4 +1,4 @@
-import { getElectronAPI, isElectron } from "../platform/electron";
+import { getElectronAPI, isElectron } from "../../platform/electron";
 import { buildProjectManifest } from "./projectFolder";
 import { rehydrateProjectManifestJson } from "./projectMediaRehydrate";
 

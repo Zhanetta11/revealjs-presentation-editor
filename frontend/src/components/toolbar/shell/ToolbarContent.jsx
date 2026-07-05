@@ -62,6 +62,7 @@ export default function ToolbarContent({
   onPaste,
   onUndo,
   onRedo,
+  canCopyCut,
   canPaste,
   canUndo,
   canRedo,
@@ -193,7 +194,7 @@ export default function ToolbarContent({
           onPaste={onPaste}
           onUndo={onUndo}
           onRedo={onRedo}
-          hasSelection={!!selectedElement}
+          hasSelection={canCopyCut}
           canPaste={canPaste}
           canUndo={canUndo}
           canRedo={canRedo}

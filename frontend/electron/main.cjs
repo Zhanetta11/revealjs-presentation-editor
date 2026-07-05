@@ -2,10 +2,11 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('e
 const path = require('path');
 const { pathToFileURL, fileURLToPath } = require('url');
 const { randomUUID } = require('crypto');
-const isDev = require('electron-is-dev');
 const fs = require('fs');
 const logger = require('./logger.cjs');
 const config = require('./config.cjs');
+
+const isDev = !app.isPackaged;
 const devtools = isDev ? require('./devtools.cjs') : null;
 
 let mainWindow;
@@ -143,9 +144,11 @@ function createWindow() {
     mainWindow.maximize();
   }
 
-  const startUrl = isDev
-    ? 'http://localhost:5173'
-    : pathToFileURL(path.join(__dirname, '../dist/index.html')).href;
+const prodIndexPath = path.join(__dirname, '../dist/index.html');
+
+const startUrl = isDev
+  ? 'http://localhost:5173'
+  : pathToFileURL(prodIndexPath).href;
 
   logger.info('Loading URL', { url: startUrl });
   mainWindow.loadURL(startUrl);
@@ -791,18 +794,20 @@ ipcMain.handle('project:chooseOpenFolder', async (event) => {
   requireTrustedSender(event);
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Open Presentation Project',
-    properties: ['openFile'],
-    filters: [
-      { name: 'Presentation Project', extensions: ['json'] },
-      { name: 'All Files', extensions: ['*'] },
-    ],
+    buttonLabel: 'Open Project Folder',
+    properties: ['openDirectory'],
   });
   if (result.canceled || !result.filePaths[0]) return null;
-  const selectedFile = normalizeFilePath(result.filePaths[0]);
-  if (path.basename(selectedFile).toLowerCase() !== 'presentation.json') {
-    throw new Error('Select the presentation.json file inside the project folder.');
+  const projectFolder = normalizeFilePath(result.filePaths[0]);
+  const manifestPath = path.join(projectFolder, 'presentation.json');
+  try {
+    const text = await fs.promises.readFile(manifestPath, 'utf-8');
+    JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      'The selected folder is not a valid presentation project. It must contain a valid presentation.json file.',
+    );
   }
-  const projectFolder = normalizeFilePath(path.dirname(selectedFile));
   allowedProjectReadFolders.add(projectFolder);
   return projectFolder;
 });
@@ -1183,7 +1188,7 @@ const template = [
         },
       },
       {
-        label: 'Open...',
+        label: 'Open Project Folder...',
         accelerator: 'CmdOrCtrl+O',
         click: () => {
           if (mainWindow) mainWindow.webContents.send('menu:open');

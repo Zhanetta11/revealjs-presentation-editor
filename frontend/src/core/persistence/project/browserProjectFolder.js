@@ -59,6 +59,22 @@ async function chooseNewProjectFolder(presentationTitle) {
   return { folderHandle, folderName };
 }
 
+async function chooseExistingProjectFolder() {
+  let folderHandle;
+  try {
+    folderHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+  } catch (e) {
+    if (e?.name === "AbortError") return null;
+    throw e;
+  }
+
+  if (!(await verifyPermission(folderHandle, "readwrite"))) {
+    throw new Error("Permission to access this project folder was denied.");
+  }
+
+  return folderHandle;
+}
+
 async function writeFileToFolder(folderHandle, relativePath, content) {
   const segments = relativePath.split("/");
   let dir = folderHandle;
@@ -127,8 +143,11 @@ async function getWritableLinkedFolder(presentationId) {
   if (!folderHandle) {
     throw new Error("The presentation is not linked to a browser project folder.");
   }
-  const permission = await folderHandle.queryPermission({ mode: "readwrite" });
-  if (permission !== "granted") {
+  // Request permission on the existing handle. With a user gesture (explicit
+  // Save) this prompts; without one (autosave) requestPermission resolves to
+  // the current state without a dialog, so autosave errors rather than falling
+  // back to the draft cache.
+  if (!(await verifyPermission(folderHandle))) {
     throw new Error("Write permission for the browser project folder is unavailable.");
   }
   return folderHandle;
@@ -138,8 +157,13 @@ export async function saveProjectToBrowserFolder({ presentationId, presentationT
   if (!presentationId) throw new Error("Missing presentation id.");
 
   let folderHandle = forceNewFolder ? null : await linkedFolderStore.get(presentationId);
+  // A linked project exists: request permission on that same folder. If the
+  // user denies it, keep the project identity and surface an error instead of
+  // silently opening a folder picker (which would spawn a second project).
   if (folderHandle && !(await verifyPermission(folderHandle))) {
-    folderHandle = null;
+    throw new Error(
+      "Write permission for the project folder was denied. The presentation is still linked to that folder.",
+    );
   }
 
   let folderName;
@@ -222,11 +246,62 @@ export async function loadBrowserLinkedProjectSnapshot(presentationId) {
   return { jsonText, projectFolder: folderHandle.name };
 }
 
-export async function getBrowserLinkedFolderName(presentationId) {
+export async function openBrowserProjectFolderFromPicker() {
+  const folderHandle = await chooseExistingProjectFolder();
+  if (!folderHandle) return null;
+
+  let fileHandle;
+  try {
+    fileHandle = await folderHandle.getFileHandle("presentation.json");
+  } catch {
+    throw new Error(
+      "The selected folder is not a presentation project. It must contain presentation.json.",
+    );
+  }
+
+  const file = await fileHandle.getFile();
+  const manifestText = await file.text();
+  JSON.parse(manifestText);
+  const jsonText = await rehydrateProjectManifestJson(
+    manifestText,
+    (relativePath) => readFileFromFolder(folderHandle, relativePath),
+    {
+      cacheKeyForPath: (relativePath) =>
+        `media/browser-project-open-${folderHandle.name}-${relativePath.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
+    },
+  );
+  const parsed = JSON.parse(manifestText);
+  const title =
+    parsed?.slideset?.title
+    ?? parsed?.slideset?.filename
+    ?? folderHandle.name;
+  const recentId = await recentProjectsStore.upsert({
+    handle: folderHandle,
+    title,
+  });
+
+  return {
+    jsonText,
+    projectFolder: folderHandle.name,
+    folderHandle,
+    recentId,
+  };
+}
+
+// Non-prompting: reports whether a linked folder exists and whether write
+// permission is currently granted. A linked handle whose permission lapsed is
+// still a valid project — callers must not treat it as "no folder".
+export async function getBrowserLinkedFolder(presentationId) {
   const handle = await linkedFolderStore.get(presentationId);
   if (!handle) return null;
-  const granted = (await handle.queryPermission({ mode: "readwrite" })) === "granted";
-  return granted ? handle.name : null;
+  const granted =
+    (await handle.queryPermission({ mode: "readwrite" })) === "granted";
+  return { name: handle.name, granted };
+}
+
+export async function getBrowserLinkedFolderName(presentationId) {
+  const info = await getBrowserLinkedFolder(presentationId);
+  return info?.granted ? info.name : null;
 }
 
 export async function getBrowserLinkedPresentationIds() {
@@ -238,10 +313,16 @@ export async function getBrowserRecentProjects() {
   return list.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }));
 }
 
-export async function openBrowserRecentProject(recentId) {
+export async function openBrowserRecentProject(
+  recentId,
+  { writable = false } = {},
+) {
   const entry = await recentProjectsStore.get(recentId);
   if (!entry) throw new Error("This project is not in the recent list.");
-  const allowed = await verifyPermission(entry.handle, "read");
+  const allowed = await verifyPermission(
+    entry.handle,
+    writable ? "readwrite" : "read",
+  );
   if (!allowed) throw new Error("Permission to access this folder was denied.");
   const fileHandle = await entry.handle.getFileHandle("presentation.json");
   const file = await fileHandle.getFile();
@@ -258,6 +339,29 @@ export async function linkBrowserRecentProject(presentationId, recentId) {
   const entry = await recentProjectsStore.get(recentId);
   if (!entry) throw new Error("This project is not in the recent list.");
   await linkedFolderStore.set(presentationId, entry.handle);
+}
+
+export async function linkBrowserProjectFolder(presentationId, folderHandle) {
+  if (!presentationId) throw new Error("Missing presentation id.");
+  if (!folderHandle) throw new Error("Missing project folder handle.");
+  await linkedFolderStore.set(presentationId, folderHandle);
+}
+
+export async function isBrowserRecentProjectLinkedToPresentation(
+  presentationId,
+  recentId,
+) {
+  if (!presentationId || !recentId) return false;
+  const [linkedHandle, recentEntry] = await Promise.all([
+    linkedFolderStore.get(presentationId),
+    recentProjectsStore.get(recentId),
+  ]);
+  if (!linkedHandle || !recentEntry?.handle) return false;
+  try {
+    return await linkedHandle.isSameEntry(recentEntry.handle);
+  } catch {
+    return false;
+  }
 }
 
 export async function removeBrowserRecentProject(recentId) {

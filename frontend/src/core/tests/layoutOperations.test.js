@@ -10,6 +10,7 @@ import {
     addLayoutElement,
     deleteLayoutElement,
     updateLayoutElement,
+    updateLayoutItem,
     resetSlideToLayout,
 } from "../operations/layoutOperations";
 
@@ -591,5 +592,23 @@ describe("updateLayoutElement", () => {
     }]);
     const updated = updateLayoutElement(p, "a", "text", "el-1", { width: 500 });
     expect(updated.slideset.layouts[0].elements.text[1].width).toBe(200);
+  });
+
+  test("updates z-index in non-text layout element collections", () => {
+    const p = makePresentation([{
+      "layout-id": "a",
+      placeholders: [],
+      elements: {
+        text: [],
+        media: [],
+        shapes: [{ id: "shape-1", "z-index": 1 }],
+      },
+    }]);
+
+    const updated = updateLayoutItem(p, "a", "shape-1", {
+      "z-index": 4,
+    });
+
+    expect(updated.slideset.layouts[0].elements.shapes[0]["z-index"]).toBe(4);
   });
 });

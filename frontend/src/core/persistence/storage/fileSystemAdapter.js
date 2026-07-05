@@ -1,4 +1,4 @@
-import { getElectronAPI } from "../platform/electron";
+import { getElectronAPI } from "../../platform/electron";
 
 export const fileSystemAdapter = {
   async set(key, value) {

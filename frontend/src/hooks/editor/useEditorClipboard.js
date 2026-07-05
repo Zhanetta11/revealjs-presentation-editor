@@ -1,9 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSlideElement } from "../../core/operations/slideOperations";
 import { createImageMediaElement } from "../../core/operations/mediaOperations";
 import { storeMediaFile } from "../../core/persistence/persistenceFacade";
 import {
   htmlToClipboardParagraphs,
+  clipboardParagraphsToPlainText,
+  extractClipboardParagraphs,
   insertClipboardParagraphs,
   plainTextToClipboardParagraphs,
 } from "../../core/text/clipboardText";
@@ -24,6 +26,7 @@ export function useEditorClipboard({
   clipboard,
   currentFormatting,
   activeSelectionRef,
+  editingTextElementId,
   setActiveSelection,
   setPendingFormatting,
   updateTextElementParagraphs,
@@ -37,35 +40,147 @@ export function useEditorClipboard({
   cutElement,
   pasteElement,
 }) {
+  const internalTextClipboardRef = useRef(null);
+  const [internalTextClipboard, setInternalTextClipboard] = useState(null);
+  const [hasInternalObjectClipboard, setHasInternalObjectClipboard] = useState(
+    Boolean(clipboard),
+  );
+
+  const resolveLiveTextClipboard = useCallback(
+    (explicitElement = null) => {
+      if (explicitElement || selectedElements.length > 1) return null;
+
+      const selection = activeSelectionRef.current;
+      const endParagraphIdx =
+        selection?.endParagraphIdx ?? selection?.paragraphIdx;
+      const hasExpandedSelection =
+        selection &&
+        (selection.paragraphIdx !== endParagraphIdx ||
+          selection.rangeStart !== selection.rangeEnd);
+      const hasLiveTextTarget =
+        hasExpandedSelection &&
+        selection.elementId === selectedElementId &&
+        selectedTextElement?.id === selectedElementId &&
+        editingTextElementId === selectedElementId;
+
+      if (!hasLiveTextTarget) return null;
+      const paragraphs = extractClipboardParagraphs(
+        selectedTextElement.paragraphs,
+        selection,
+      );
+      if (paragraphs.length === 0) return null;
+      return {
+        paragraphs,
+        plainText: clipboardParagraphsToPlainText(paragraphs),
+      };
+    },
+    [
+      activeSelectionRef,
+      editingTextElementId,
+      selectedElementId,
+      selectedElements.length,
+      selectedTextElement,
+    ],
+  );
+
+  const storeInternalTextClipboard = useCallback((nextClipboard) => {
+    internalTextClipboardRef.current = nextClipboard;
+    setInternalTextClipboard(nextClipboard);
+  }, []);
+
+  const runTextClipboardCommand = useCallback(
+    (command, explicitElement) => {
+      const nextClipboard = resolveLiveTextClipboard(explicitElement);
+      if (!nextClipboard) return null;
+
+      try {
+        const succeeded = document.execCommand?.(command) === true;
+        if (succeeded) storeInternalTextClipboard(nextClipboard);
+        return succeeded;
+      } catch {
+        return false;
+      }
+    },
+    [
+      resolveLiveTextClipboard,
+      storeInternalTextClipboard,
+    ],
+  );
+
+  useEffect(() => {
+    const captureNativeTextClipboard = () => {
+      const nextClipboard = resolveLiveTextClipboard();
+      if (nextClipboard) storeInternalTextClipboard(nextClipboard);
+    };
+    document.addEventListener("copy", captureNativeTextClipboard);
+    document.addEventListener("cut", captureNativeTextClipboard);
+    return () => {
+      document.removeEventListener("copy", captureNativeTextClipboard);
+      document.removeEventListener("cut", captureNativeTextClipboard);
+    };
+  }, [resolveLiveTextClipboard, storeInternalTextClipboard]);
+
   const handleCopy = useCallback(
     (elementOrEvent) => {
-      if (selectedElements.length > 1 && !elementOrEvent?.id) {
+      const explicitElement = elementOrEvent?.id ? elementOrEvent : null;
+      const textCopyResult = runTextClipboardCommand("copy", explicitElement);
+      if (textCopyResult !== null) return textCopyResult;
+
+      if (selectedElements.length > 1 && !explicitElement) {
+        storeInternalTextClipboard(null);
+        setHasInternalObjectClipboard(true);
         copyElement(selectedElements);
-        return;
+        return true;
       }
-      const element = elementOrEvent?.id
-        ? elementOrEvent
+      const element = explicitElement
+        ? explicitElement
         : getSlideElement(selectedSlide, selectedElementId);
-      if (element) copyElement(element);
+      if (!element) return false;
+      storeInternalTextClipboard(null);
+      setHasInternalObjectClipboard(true);
+      copyElement(element);
+      return true;
     },
-    [selectedSlide, selectedElementId, selectedElements, copyElement],
+    [
+      selectedSlide,
+      selectedElementId,
+      selectedElements,
+      copyElement,
+      runTextClipboardCommand,
+      storeInternalTextClipboard,
+    ],
   );
 
   const handleCut = useCallback(
     (elementOrEvent) => {
-      if (selectedElements.length > 1 && !elementOrEvent?.id) {
-        cutElement(selectedElements);
-        return;
-      }
-      const element = elementOrEvent?.id
-        ? elementOrEvent
-        : getSlideElement(selectedSlide, selectedElementId);
-      if (element) cutElement(element);
-    },
-    [selectedSlide, selectedElementId, selectedElements, cutElement],
-  );
+      const explicitElement = elementOrEvent?.id ? elementOrEvent : null;
+      const textCutResult = runTextClipboardCommand("cut", explicitElement);
+      if (textCutResult !== null) return textCutResult;
 
-  const handlePaste = useCallback(() => pasteElement(), [pasteElement]);
+      if (selectedElements.length > 1 && !explicitElement) {
+        storeInternalTextClipboard(null);
+        setHasInternalObjectClipboard(true);
+        cutElement(selectedElements);
+        return true;
+      }
+      const element = explicitElement
+        ? explicitElement
+        : getSlideElement(selectedSlide, selectedElementId);
+      if (!element) return false;
+      storeInternalTextClipboard(null);
+      setHasInternalObjectClipboard(true);
+      cutElement(element);
+      return true;
+    },
+    [
+      selectedSlide,
+      selectedElementId,
+      selectedElements,
+      cutElement,
+      runTextClipboardCommand,
+      storeInternalTextClipboard,
+    ],
+  );
 
   const handlePasteText = useCallback(
     async (elementId, mode = "destination") => {
@@ -105,6 +220,7 @@ export function useEditorClipboard({
       const internalText = internalClipboard.find(
         (element) => element["media-type"] === undefined,
       );
+      const rangeClipboard = internalTextClipboardRef.current;
       const htmlParagraphs = payload.html
         ? htmlToClipboardParagraphs(payload.html)
         : [];
@@ -114,12 +230,21 @@ export function useEditorClipboard({
       const internalPlainText = (internalText?.paragraphs ?? [])
         .map((paragraph) => paragraphText(paragraph))
         .join("\n");
+      const rangePlainText = rangeClipboard?.plainText ?? "";
       const clipboardText =
-        payload.text || htmlPlainText || internalPlainText;
+        payload.text || htmlPlainText || rangePlainText || internalPlainText;
 
       let clipboardParagraphs = [];
       if (mode === "source" && htmlParagraphs.length) {
         clipboardParagraphs = htmlParagraphs;
+      }
+      if (
+        mode === "source" &&
+        clipboardParagraphs.length === 0 &&
+        rangeClipboard?.paragraphs?.length &&
+        (!payload.text || payload.text === rangePlainText)
+      ) {
+        clipboardParagraphs = structuredClone(rangeClipboard.paragraphs);
       }
       if (
         mode === "source" &&
@@ -167,6 +292,29 @@ export function useEditorClipboard({
       updateTextElementParagraphs,
     ],
   );
+
+  const handlePaste = useCallback(() => {
+    if (internalTextClipboardRef.current) {
+      if (
+        editingTextElementId === selectedElementId &&
+        selectedTextElement?.id === selectedElementId
+      ) {
+        return handlePasteText(selectedElementId, "source");
+      }
+      return false;
+    }
+    if (!clipboard && !hasInternalObjectClipboard) return false;
+    pasteElement();
+    return true;
+  }, [
+    clipboard,
+    editingTextElementId,
+    handlePasteText,
+    hasInternalObjectClipboard,
+    pasteElement,
+    selectedElementId,
+    selectedTextElement?.id,
+  ]);
 
   const handlePastePicture = useCallback(
     async (targetElementId) => {
@@ -257,11 +405,13 @@ export function useEditorClipboard({
         updateElement(targetElement.id, { hidden: true });
         commitHistory();
       };
-      const internalClipboard = Array.isArray(clipboard)
-        ? clipboard
-        : clipboard
-          ? [clipboard]
-          : [];
+      const internalClipboard = internalTextClipboardRef.current
+        ? []
+        : Array.isArray(clipboard)
+          ? clipboard
+          : clipboard
+            ? [clipboard]
+            : [];
       const internalMedia = internalClipboard.find(
         (element) => element["media-type"] !== undefined,
       );
@@ -333,5 +483,10 @@ export function useEditorClipboard({
     handlePaste,
     handlePasteText,
     handlePastePicture,
+    canPaste:
+      Boolean(clipboard) ||
+      hasInternalObjectClipboard ||
+      Boolean(internalTextClipboard),
+    hasInternalTextClipboard: Boolean(internalTextClipboard),
   };
 }

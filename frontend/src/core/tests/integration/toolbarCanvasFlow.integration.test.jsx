@@ -21,17 +21,17 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import EditorPage from "../../../pages/EditorPage";
 import { createDefaultPresentation } from "../../model/defaultPresentation";
 import { addSlide } from "../../operations/slideOperations";
-import { serializePresentation } from "../../persistence/serializationOperations";
+import { serializePresentation } from "../../persistence/serialization/serializationOperations";
 
 describe("toolbar + canvas + slide list integration (real EditorPage)", () => {
   beforeAll(() => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    global.ResizeObserver = class {
+    globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
       disconnect() {}

@@ -1,6 +1,17 @@
 export const paragraphText = (paragraph) =>
   (paragraph?.runs ?? []).map((run) => run.text ?? "").join("");
 
+export const canCopyOrCutEditorSelection = ({
+  hasRealTextSelection,
+  selectedElementCount,
+  isEditingSelectedText,
+  objectSelectionMode,
+}) =>
+  Boolean(hasRealTextSelection) ||
+  selectedElementCount > 1 ||
+  (selectedElementCount === 1 &&
+    (!isEditingSelectedText || objectSelectionMode));
+
 export const getSelectedLink = (textElement, selection) => {
   if (!textElement || !selection) return null;
   const para = textElement.paragraphs?.[selection.paragraphIdx];

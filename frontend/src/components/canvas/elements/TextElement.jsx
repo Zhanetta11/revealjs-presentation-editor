@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import FormatToolbar from "../tools/FormatToolbar";
 import PlaceholderActionButtons from "./text/PlaceholderActionButtons";
@@ -121,7 +121,13 @@ export default function TextElement({
   });
 
   const formatting = textElement.paragraphs?.[0]?.formatting ?? {};
-  const masterFormatting = presentation?.slideset?.master?.formatting ?? {};
+  const masterFormattingSource = presentation?.slideset?.master?.formatting;
+  // Stable identity so the deselect effect's dep list doesn't change every
+  // render when master formatting is absent (the `?? {}` would allocate anew).
+  const masterFormatting = useMemo(
+    () => masterFormattingSource ?? {},
+    [masterFormattingSource],
+  );
   const placeholderFormatting = getPlaceholderFormatting(
     presentation,
     slide,
@@ -217,7 +223,14 @@ export default function TextElement({
         ?? "decimal",
       markerStyle: {
         fontSize: markerFormatting.size,
-        lineHeight: markerFormatting["line-spacing"],
+        // The marker span is absolutely positioned at the measured top of the
+        // first text line's *glyph box* (paragraphTextTops), which already
+        // accounts for line-spacing/paragraph-spacing. Using the paragraph's
+        // line-spacing multiplier here would add a second half-leading that
+        // scales with spacing, pushing the marker below the text. "normal"
+        // makes the marker's own glyph box start exactly at that measured top,
+        // so the marker stays aligned with the first line at any spacing.
+        lineHeight: "normal",
         fontFamily: markerFormatting.font,
         fontWeight: markerFormatting.weight,
         fontStyle:
@@ -318,6 +331,10 @@ export default function TextElement({
   }, [activeParagraphIndex, activeEffect]);
 
   const wasPrimarySelectedRef = useRef(isPrimarySelected);
+  // Runs only on a select -> deselect transition (guarded below). The extra
+  // deps are safe: while the element is still selected the guard returns early,
+  // so the "restore prompt / commit history" body executes exactly once, on
+  // deselection \u2014 the same behavior as before, now with an honest dep list.
   useEffect(() => {
     const wasSelected = wasPrimarySelectedRef.current;
     wasPrimarySelectedRef.current = isPrimarySelected;
@@ -344,7 +361,16 @@ export default function TextElement({
       isTypingRef.current = false;
       onCommitHistory?.();
     }
-  }, [isPrimarySelected]);
+  }, [
+    isPrimarySelected,
+    isContentPlaceholder,
+    masterFormatting,
+    placeholderFormatting,
+    textElement.paragraphs,
+    textElement.id,
+    onChangeParagraphs,
+    onCommitHistory,
+  ]);
 
   const handleFormat = (id, updates) => {
     if (isDeletingRef.current || isTypingRef.current) {

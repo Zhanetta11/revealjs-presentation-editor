@@ -44,6 +44,26 @@ describe("zOrderOperations", () => {
     ]);
   });
 
+  test("orders every supported element collection in one stack", () => {
+    const slide = {
+      contents: {
+        text: [element("text", 5)],
+        media: [element("media", 4)],
+        shapes: [element("shape", 3)],
+        tables: [element("table", 2)],
+        groups: [element("group", 1)],
+      },
+    };
+
+    expect(getElementsInZOrder(slide).map((item) => item.id)).toEqual([
+      "group",
+      "table",
+      "shape",
+      "media",
+      "text",
+    ]);
+  });
+
   test("bring forward swaps with the next visible layer and removes ties", () => {
     const slide = slideWith({
       text: [element("a", 1), element("b", 2)],

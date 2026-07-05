@@ -1,4 +1,7 @@
-import { storeMediaFile, storeMediaFileAtKey } from "./mediaStorage";
+import {
+  storeMediaFile,
+  storeMediaFileAtKey,
+} from "../storage/mediaStorage";
 
 const isRelativeMediaPath = (value) =>
   typeof value === "string" && (value.startsWith("media/") || value.startsWith("fonts/"));

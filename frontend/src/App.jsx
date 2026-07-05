@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
   useParams,
 } from "react-router-dom";
 import HomePage from "./pages/HomePage";
@@ -12,7 +13,9 @@ import { isElectron } from "./core/platform/electron";
 
 function EditorPageKeyed() {
   const { presentationId } = useParams();
-  return <EditorPage key={presentationId} />;
+  const location = useLocation();
+  const reloadToken = location.state?.reloadPresentationToken ?? "";
+  return <EditorPage key={`${presentationId}:${reloadToken}`} />;
 }
 
 export default function App() {

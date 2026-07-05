@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { MdClose } from "react-icons/md";
 import { useMediaSrc } from "../../../hooks/media/useMediaSrc";
 import "./FormatBackgroundPanel.css";
@@ -100,22 +100,24 @@ export default function FormatBackgroundPanel({
   const [fitToCanvas, setScaleToCanvas] = useState(storedSettings.fitToCanvas ?? false);
 
   const slideId = slide?.id;
-  useEffect(() => {
-    const bg = slide?.contents?.background ?? null;
-    const isImg = bg && typeof bg === "object" && bg.type === "image";
-    const settings = isImg ? bg : {};
-    const effective = isImg ? null : (!bg || bg === "#FFFFFFFF" ? themeBgLight : bg);
-    const p = parseStoredColor(effective);
+  // Re-sync the editing controls to the stored background whenever it changes
+  // (slide switch or an external background edit). Done during render via a
+  // tracked key — the React-recommended way to reset state on a prop change —
+  // rather than mirroring props into state inside an effect.
+  const bgSyncKey = `${slideId}|${JSON.stringify(storedBg)}|${themeBgLight}`;
+  const [lastBgSyncKey, setLastBgSyncKey] = useState(bgSyncKey);
+  if (bgSyncKey !== lastBgSyncKey) {
+    setLastBgSyncKey(bgSyncKey);
     setFillTypeOverride(null);
-    setSolidColor(p.hex);
-    setTransparency(p.transparency);
-    setPicTransparency(settings.transparency ?? 0);
-    setOffsetLeft(settings.offsetLeft ?? 0);
-    setOffsetRight(settings.offsetRight ?? 0);
-    setOffsetTop(settings.offsetTop ?? 0);
-    setOffsetBottom(settings.offsetBottom ?? 0);
-    setScaleToCanvas(settings.fitToCanvas ?? false);
-  }, [slideId, slide?.contents?.background, themeBgLight]);
+    setSolidColor(parsed.hex);
+    setTransparency(parsed.transparency);
+    setPicTransparency(storedSettings.transparency ?? 0);
+    setOffsetLeft(storedSettings.offsetLeft ?? 0);
+    setOffsetRight(storedSettings.offsetRight ?? 0);
+    setOffsetTop(storedSettings.offsetTop ?? 0);
+    setOffsetBottom(storedSettings.offsetBottom ?? 0);
+    setScaleToCanvas(storedSettings.fitToCanvas ?? false);
+  }
 
   const fileInputRef = useRef(null);
 

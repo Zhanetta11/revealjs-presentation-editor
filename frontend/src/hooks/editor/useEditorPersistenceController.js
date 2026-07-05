@@ -12,14 +12,43 @@ import {
   deleteDraftManifest,
   deletePresentation,
   downloadPresentationAsJson,
+  getPresentationSource,
+  linkBrowserProjectFolder,
+  openBrowserProjectFolderFromPicker,
   openElectronProjectFolder,
   saveBrowserProjectSnapshot,
   writeAndCommitElectronProjectSnapshot,
 } from "../../core/persistence/persistenceFacade";
-import { deserializePresentation } from "../../core/persistence/serializationOperations";
-import { importPresentationFromJson } from "../../core/persistence/importPresentation";
-import { rehydrateProjectManifestJson } from "../../core/persistence/projectMediaRehydrate";
-import { openRecentProject } from "../useProjectLibrary";
+import { deserializePresentation } from "../../core/persistence/serialization/serializationOperations";
+import { importPresentationFromJson } from "../../core/persistence/serialization/importPresentation";
+import { rehydrateProjectManifestJson } from "../../core/persistence/project/projectMediaRehydrate";
+import {
+  isRecentProjectCurrentSource,
+  openRecentProject,
+} from "../useProjectLibrary";
+
+const hasProjectRelativeAssetReferences = (jsonText) => {
+  try {
+    const parsed = JSON.parse(jsonText);
+    const walk = (value) => {
+      if (Array.isArray(value)) return value.some(walk);
+      if (!value || typeof value !== "object") return false;
+      return Object.entries(value).some(([key, child]) => {
+        if (
+          (key === "file-link" || key === "font-file") &&
+          typeof child === "string" &&
+          (child.startsWith("media/") || child.startsWith("fonts/"))
+        ) {
+          return true;
+        }
+        return walk(child);
+      });
+    };
+    return walk(parsed);
+  } catch {
+    return false;
+  }
+};
 
 export function useEditorPersistenceController({
   presentationId,
@@ -143,7 +172,21 @@ export function useEditorPersistenceController({
   }, [presentation]);
 
   const handleSave = useCallback(async () => {
-    const sourceBeforeSave = presentationSource;
+    let sourceBeforeSave = presentationSource;
+    if (isElectron() && sourceBeforeSave.kind !== "project") {
+      try {
+        const restoredSource = await getPresentationSource(presentationId);
+        if (restoredSource.kind === "project") {
+          sourceBeforeSave = restoredSource;
+          setPresentationSource(restoredSource);
+        }
+      } catch (error) {
+        console.warn(
+          "[EditorPage] Could not refresh Electron project source:",
+          error,
+        );
+      }
+    }
     const result = await savePresentation();
     if (!result.success || !canUseProjectFolders) return;
     if (sourceBeforeSave.kind === "project") return;
@@ -182,16 +225,21 @@ export function useEditorPersistenceController({
     }
   }, [
     presentationSource,
+    presentationId,
     savePresentation,
     saveProjectToFolder,
     canUseProjectFolders,
     promptForPresentationName,
+    setPresentationSource,
   ]);
 
   const handleSaveAs = useCallback(async () => {
     if (isElectron()) {
-      const result = await savePresentation();
-      if (!result.success) return;
+      // Save As must not touch the old project. Do NOT call savePresentation()
+      // first (that would write current edits into the current project sink).
+      // saveProjectToFolder(true) builds directly from the in-memory snapshot,
+      // commits to the newly chosen folder, and only then switches the source;
+      // a cancel or commit failure leaves the old project untouched.
       try {
         await saveProjectToFolder(true);
       } catch (error) {
@@ -254,7 +302,6 @@ export function useEditorPersistenceController({
     }
   }, [
     presentation,
-    savePresentation,
     saveProjectToFolder,
     canUseProjectFolders,
     promptForPresentationName,
@@ -351,12 +398,36 @@ export function useEditorPersistenceController({
 
   const handleOpenRecentProject = useCallback(
     async (key) => {
+      const isCurrentProject = await isRecentProjectCurrentSource(
+        key,
+        presentationId,
+        presentationSource,
+      );
       if (!(await prepareToLeave())) return false;
-      const id = await openRecentProject(key);
-      navigate(`/editor/${id}`);
+      if (isCurrentProject) {
+        navigate(`/editor/${presentationId}`, {
+          replace: true,
+          state: { reloadPresentationToken: crypto.randomUUID() },
+        });
+        return true;
+      }
+      const id = await openRecentProject(key, { asDraftCopy: false });
+      const navigationOptions = id === presentationId
+        ? {
+            replace: true,
+            state: { reloadPresentationToken: crypto.randomUUID() },
+          }
+        : undefined;
+      if (navigationOptions) navigate(`/editor/${id}`, navigationOptions);
+      else navigate(`/editor/${id}`);
       return true;
     },
-    [navigate, prepareToLeave],
+    [
+      navigate,
+      prepareToLeave,
+      presentationId,
+      presentationSource,
+    ],
   );
 
   const handleLoadFile = useCallback(
@@ -370,6 +441,12 @@ export function useEditorPersistenceController({
           );
         }
         if (!(await prepareToLeave())) return;
+        if (!readMediaFile && hasProjectRelativeAssetReferences(jsonText)) {
+          const message =
+            "This presentation references external media. Open the project folder instead to load images.";
+          if (isElectron()) getElectronAPI().showMessage("Import JSON", message);
+          else window.alert(message);
+        }
         const finalJson = readMediaFile
           ? await rehydrateProjectManifestJson(jsonText, readMediaFile)
           : jsonText;
@@ -391,29 +468,99 @@ export function useEditorPersistenceController({
 
   const openElectronProjectFromFolder = useCallback(
     async (projectFolder) => {
+      const isCurrentProject = await isRecentProjectCurrentSource(
+        projectFolder,
+        presentationId,
+        presentationSource,
+      );
       if (!(await prepareToLeave())) return false;
-      const { presentationId: id } =
-        await openElectronProjectFolder(projectFolder);
-      navigate(`/editor/${id}`);
+      if (isCurrentProject) {
+        navigate(`/editor/${presentationId}`, {
+          replace: true,
+          state: { reloadPresentationToken: crypto.randomUUID() },
+        });
+        return true;
+      }
+      const id =
+        (await openElectronProjectFolder(projectFolder)).presentationId;
+      const navigationOptions = id === presentationId
+        ? {
+            replace: true,
+            state: { reloadPresentationToken: crypto.randomUUID() },
+          }
+        : undefined;
+      if (navigationOptions) navigate(`/editor/${id}`, navigationOptions);
+      else navigate(`/editor/${id}`);
       return true;
     },
-    [navigate, prepareToLeave],
+    [
+      navigate,
+      prepareToLeave,
+      presentationId,
+      presentationSource,
+    ],
   );
 
   const handleElectronOpen = useCallback(async () => {
     const api = getElectronAPI();
+    if (typeof api?.chooseProjectToOpen !== "function") {
+      console.warn("[EditorPage] Electron project open API is unavailable.");
+      return false;
+    }
     try {
       const projectFolder = await chooseElectronProjectToOpen();
-      if (!projectFolder) return;
-      await openElectronProjectFromFolder(projectFolder);
+      if (!projectFolder) return false;
+      return await openElectronProjectFromFolder(projectFolder);
     } catch (error) {
       console.error("[EditorPage] Failed to open project:", error);
-      api.showError(
+      api?.showError?.(
         "Open Failed",
         error?.message ?? "Could not open this project.",
       );
+      return false;
     }
   }, [openElectronProjectFromFolder]);
+
+  const handleOpenProjectFolder = useCallback(async () => {
+    if (typeof getElectronAPI()?.chooseProjectToOpen === "function") {
+      return handleElectronOpen();
+    }
+    if (!supportsFileSystemAccess()) {
+      window.alert("Project folders are not supported in this browser. Use Import JSON instead.");
+      return false;
+    }
+    try {
+      const opened = await openBrowserProjectFolderFromPicker();
+      if (!opened) return false;
+      const isCurrentProject = await isRecentProjectCurrentSource(
+        opened.recentId,
+        presentationId,
+        presentationSource,
+      );
+      if (!(await prepareToLeave())) return false;
+      if (isCurrentProject) {
+        navigate(`/editor/${presentationId}`, {
+          replace: true,
+          state: { reloadPresentationToken: crypto.randomUUID() },
+        });
+        return true;
+      }
+      const id = await importPresentationFromJson(opened.jsonText);
+      await linkBrowserProjectFolder(id, opened.folderHandle);
+      navigate(`/editor/${id}`);
+      return true;
+    } catch (error) {
+      console.error("[EditorPage] Failed to open project folder:", error);
+      window.alert(error?.message ?? "Could not open this project folder.");
+      return false;
+    }
+  }, [
+    handleElectronOpen,
+    navigate,
+    prepareToLeave,
+    presentationId,
+    presentationSource,
+  ]);
 
   useEffect(() => {
     if (!isElectron()) return;
@@ -476,6 +623,7 @@ export function useEditorPersistenceController({
     handleNew,
     handleOpenRecentProject,
     handleElectronOpen,
+    handleOpenProjectFolder,
     handleLoadFile,
     handleDeleteAndGoHome,
   };

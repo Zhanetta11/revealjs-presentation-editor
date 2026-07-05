@@ -14,6 +14,9 @@ export const buildMasterPseudoSlide = (masterElements, masterColorTheme) => {
     contents: {
       text: masterElements.text ?? [],
       media: masterElements.media ?? [],
+      shapes: masterElements.shapes ?? [],
+      tables: masterElements.tables ?? [],
+      groups: masterElements.groups ?? [],
       background,
     },
   };
@@ -37,6 +40,9 @@ export const buildLayoutPseudoSlide = (layout, masterColorTheme) => {
           .map((p) => createPlaceholderPseudoElement(p)),
         ...(layout.elements?.media ?? []),
       ],
+      shapes: layout.elements?.shapes ?? [],
+      tables: layout.elements?.tables ?? [],
+      groups: layout.elements?.groups ?? [],
       background,
     },
   };
@@ -430,15 +436,20 @@ export const updateMasterItem = (presentation, elementId, updates) => {
   const elements = presentation?.slideset?.master?.elements ?? {};
   const { text, formatting, ...rest } = updates;
 
-  const isText = (elements.text ?? []).some((el) => el.id === elementId);
-  const isMedia = (elements.media ?? []).some((el) => el.id === elementId);
-  if (!isText && !isMedia) return presentation;
-  const elementType = isText ? "text" : "media";
+  const elementType = Object.entries(elements).find(
+    ([, items]) =>
+      Array.isArray(items) && items.some((element) => element.id === elementId),
+  )?.[0];
+  if (!elementType) return presentation;
 
   let result = presentation;
   if (Object.keys(rest).length) result = updateMasterElement(result, elementType, elementId, rest);
-  if (formatting) result = updateMasterTextFormatting(result, elementId, formatting);
-  if (text !== undefined) result = updateMasterTextContent(result, elementId, text);
+  if (elementType === "text" && formatting) {
+    result = updateMasterTextFormatting(result, elementId, formatting);
+  }
+  if (elementType === "text" && text !== undefined) {
+    result = updateMasterTextContent(result, elementId, text);
+  }
   return result;
 };
 

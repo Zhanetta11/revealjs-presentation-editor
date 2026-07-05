@@ -79,14 +79,18 @@ export const updateElement = (presentation, slideIndex, elementId, updates) => {
 
   const applyUpdates = (element) =>
     element.id === elementId ? { ...element, ...updates } : element;
+  const elementCollections = ["text", "media", "shapes", "tables", "groups"];
+  const updatedContents = { ...slide.contents };
+  elementCollections.forEach((collection) => {
+    if (Array.isArray(slide.contents?.[collection])) {
+      updatedContents[collection] =
+        slide.contents[collection].map(applyUpdates);
+    }
+  });
 
   slides[slideIndex] = {
     ...slide,
-    contents: {
-      ...slide.contents,
-      text: (slide.contents?.text ?? []).map(applyUpdates),
-      media: (slide.contents?.media ?? []).map(applyUpdates),
-    },
+    contents: updatedContents,
   };
 
   return setSlides(presentation, slides);

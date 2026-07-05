@@ -19,7 +19,7 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import { useEditorState } from "../../../hooks/editor/useEditorState";
 import { EditorEventType, createEditorEvent } from "../../events/editorEvents";
@@ -27,7 +27,7 @@ import { createDefaultPresentation } from "../../model/defaultPresentation";
 import {
   serializePresentation,
   deserializePresentation,
-} from "../../persistence/serializationOperations";
+} from "../../persistence/serialization/serializationOperations";
 
 describe("useEditorState hook integration", () => {
   beforeEach(() => {

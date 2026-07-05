@@ -15,7 +15,7 @@ const { records, storageAdapter } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../persistence/storageAdapter", () => ({ storageAdapter }));
+vi.mock("../../persistence/storage/storageAdapter", () => ({ storageAdapter }));
 
 import { useEditorState } from "../../../hooks/editor/useEditorState";
 import { useEditorActions } from "../../../hooks/editor/useEditorActions";

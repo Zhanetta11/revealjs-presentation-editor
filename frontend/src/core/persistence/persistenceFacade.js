@@ -1,4 +1,4 @@
-import { storageAdapter } from "./storageAdapter";
+import { storageAdapter } from "./storage/storageAdapter";
 import {
   getIndex,
   createPresentation,
@@ -8,9 +8,9 @@ import {
   loadPresentation,
   savePresentation,
   presentationKey,
-} from "./presentationsLibrary";
-import { storeMediaFile, getMediaFile } from "./mediaStorage";
-import { downloadPresentationAsJson } from "./serializationOperations";
+} from "./storage/presentationsLibrary";
+import { storeMediaFile, getMediaFile } from "./storage/mediaStorage";
+import { downloadPresentationAsJson } from "./serialization/serializationOperations";
 export {
   PresentationSourceKind,
   PresentationSourceStatus,
@@ -22,7 +22,7 @@ export {
   getPresentationSource,
   getProjectPresentationSources,
   releasePresentationSource,
-} from "./sourceMetadata";
+} from "./project/sourceMetadata";
 
 export const storageGet    = (key)        => storageAdapter.get(key);
 export const storageSet    = (key, value) => storageAdapter.set(key, value);
@@ -50,12 +50,14 @@ export {
   loadElectronProjectSnapshot,
   commitElectronProjectSource,
   writeAndCommitElectronProjectSnapshot,
-} from "./electronProjectFolder";
+} from "./project/electronProjectFolder";
 export {
+  openBrowserProjectFolderFromPicker,
   saveBrowserProjectSnapshot,
   writeBrowserProjectSnapshot,
   loadBrowserLinkedProjectSnapshot,
-} from "./browserProjectFolder";
+  linkBrowserProjectFolder,
+} from "./project/browserProjectFolder";
 
 const localStorageSettings = {
   get(key) {

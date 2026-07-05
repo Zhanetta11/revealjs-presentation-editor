@@ -39,6 +39,7 @@ export default function EditorPage() {
         onGoHome={() => navigate("/")}
         onNew={ctrl.handleNew}
         onOpen={ctrl.handleElectronOpen}
+        onOpenProjectFolder={ctrl.handleOpenProjectFolder}
         onOpenProject={ctrl.handleOpenRecentProject}
         onSave={ctrl.handleSave}
         onSaveAs={ctrl.handleSaveAs}
@@ -110,7 +111,8 @@ export default function EditorPage() {
           onPaste={ctrl.handlePaste}
           onUndo={ctrl.undo}
           onRedo={ctrl.redo}
-          canPaste={!!ctrl.state.clipboard}
+          canCopyCut={ctrl.canCopyCut}
+          canPaste={ctrl.canPaste}
           canUndo={ctrl.state.past.length > 0}
           canRedo={ctrl.state.future.length > 0}
           onFind={ctrl.openFind}
@@ -193,6 +195,7 @@ export default function EditorPage() {
             selectedMasterLayoutId={ctrl.selectedMasterLayoutId}
             onSelectedLayoutChange={ctrl.setSelectedMasterLayoutId}
             selectedMasterElementId={ctrl.selectedMasterElementId}
+            selectedMasterElementIds={ctrl.selectedMasterElementIds}
             onSelectMasterElement={ctrl.handleMasterElementSelect}
             onSaveSelection={ctrl.handleMasterSaveSelection}
             onStartEditing={ctrl.handleStartEditing}
@@ -310,13 +313,14 @@ export default function EditorPage() {
                   onPasteText={ctrl.handlePasteText}
                   onPastePicture={ctrl.handlePastePicture}
                   onCut={ctrl.handleCut}
+                  canCopyCut={ctrl.canCopyCut}
                   onPlaceholderImageUpload={ctrl.handlePlaceholderImageUpload}
                   onPlaceholderVideoUpload={ctrl.handlePlaceholderVideoUpload}
                   onHyperlink={ctrl.handleHyperlink}
                   onRemoveHyperlink={ctrl.handleRemoveHyperlink}
                   existingHyperlink={ctrl.selectedHyperlinkLink}
                   canHyperlink={ctrl.hasRealSelection}
-                  canPaste={!!ctrl.state.clipboard}
+                  canPaste={ctrl.canPaste}
                   canUndo={ctrl.state.past.length > 0}
                   canRedo={ctrl.state.future.length > 0}
                   onBringToFront={ctrl.handleBringToFront}

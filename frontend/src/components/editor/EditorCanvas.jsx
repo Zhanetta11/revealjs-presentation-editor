@@ -85,6 +85,7 @@ export default function EditorCanvas({
   onPasteText,
   onPastePicture,
   onCut,
+  canCopyCut = false,
   onPlaceholderImageUpload,
   onPlaceholderVideoUpload,
   onNewComment,
@@ -589,7 +590,7 @@ export default function EditorCanvas({
         <CanvasContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          hasSelection={contextMenu.hasSelection}
+          hasSelection={contextMenu.hasSelection && canCopyCut}
           contextType={contextMenu.contextType}
           elementId={contextMenu.elementId}
           formatting={currentFormatting}

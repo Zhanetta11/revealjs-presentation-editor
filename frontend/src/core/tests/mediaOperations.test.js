@@ -93,6 +93,74 @@ describe("mediaOperations", () => {
     ).toBe(90);
   });
 
+  test("updateMedia preserves explicit crop updates when the crop changes the visible frame", () => {
+    const presentation = addMedia(
+      createPresentation(),
+      0,
+      {
+        id: "media-1",
+        "file-link": "image.png",
+        width: 300,
+        height: 200,
+        "source-width": 300,
+        "source-height": 200,
+        crop: [],
+      }
+    );
+    const media = presentation.slideset.slides[0].contents.media[0];
+    const cropUpdates = computeCropResult(
+      [0, 25, 0, 0],
+      computeCropOrigin(media)
+    );
+
+    const updated = updateMedia(
+      presentation,
+      0,
+      "media-1",
+      cropUpdates
+    );
+    const cropped = updated.slideset.slides[0].contents.media[0];
+
+    expect(cropped.crop[0]).toBeCloseTo(0);
+    expect(cropped.crop[1]).toBeCloseTo(25);
+    expect(cropped.crop[2]).toBeCloseTo(0);
+    expect(cropped.crop[3]).toBeCloseTo(0);
+    expect(cropped.width).toBeCloseTo(225);
+    expect(cropped.height).toBeCloseTo(200);
+    expect(cropped["source-width"]).toBeCloseTo(300);
+    expect(cropped["source-height"]).toBeCloseTo(200);
+  });
+
+  test("updateMedia still normalizes source dimensions for ordinary uncropped resize", () => {
+    const presentation = addMedia(
+      createPresentation(),
+      0,
+      {
+        id: "media-1",
+        "file-link": "image.png",
+        width: 300,
+        height: 200,
+        "source-width": 300,
+        "source-height": 200,
+        crop: [],
+      }
+    );
+
+    const updated = updateMedia(
+      presentation,
+      0,
+      "media-1",
+      { width: 240, height: 160 }
+    );
+    const resized = updated.slideset.slides[0].contents.media[0];
+
+    expect(resized.width).toBe(240);
+    expect(resized.height).toBe(160);
+    expect(resized["source-width"]).toBe(240);
+    expect(resized["source-height"]).toBe(160);
+    expect(resized.crop).toEqual([]);
+  });
+
   test("updateElement moves media element position", () => {
     const presentation = addMedia(
       createPresentation(),

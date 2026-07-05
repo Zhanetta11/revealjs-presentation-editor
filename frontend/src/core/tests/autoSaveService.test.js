@@ -5,13 +5,13 @@ const { storageSet, updateIndexEntry } = vi.hoisted(() => ({
   updateIndexEntry: vi.fn(),
 }));
 
-vi.mock("../persistence/storageAdapter", () => ({
+vi.mock("../persistence/storage/storageAdapter", () => ({
   storageAdapter: {
     set: storageSet,
   },
 }));
 
-vi.mock("../persistence/presentationsLibrary", () => ({
+vi.mock("../persistence/storage/presentationsLibrary", () => ({
   updateIndexEntry,
 }));
 

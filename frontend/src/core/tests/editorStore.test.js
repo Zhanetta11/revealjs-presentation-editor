@@ -169,6 +169,75 @@ describe("editorReducer", () => {
     ).toBe(true);
   });
 
+  test("a new mutation clears the redo stack", () => {
+    const state = createInitialEditorState();
+    const afterAdd = editorReducer(state, {
+      type: EditorEventType.MEDIA.ADD,
+      payload: { mediaElement: { id: "m-1", "media-type": "image" } },
+    });
+    const afterUndo = editorReducer(afterAdd, {
+      type: EditorEventType.HISTORY.UNDO,
+      payload: {},
+    });
+    expect(afterUndo.future.length).toBe(1);
+
+    // A fresh mutation while a redo is available must discard the redo stack.
+    const afterNewMutation = editorReducer(afterUndo, {
+      type: EditorEventType.MEDIA.ADD,
+      payload: { mediaElement: { id: "m-2", "media-type": "image" } },
+    });
+
+    expect(afterNewMutation.future).toEqual([]);
+    expect(
+      editorReducer(afterNewMutation, { type: EditorEventType.HISTORY.REDO, payload: {} }),
+    ).toBe(afterNewMutation);
+  });
+
+  test("LAYOUT.APPLY is undoable and redoable", () => {
+    const state = createInitialEditorState();
+    const originalLayout = state.presentation.slideset.slides[0]["layout-id"];
+
+    const applied = editorReducer(state, {
+      type: EditorEventType.LAYOUT.APPLY,
+      payload: { layoutId: "two-content" },
+    });
+    expect(applied.presentation.slideset.slides[0]["layout-id"]).toBe("two-content");
+    expect(applied.past.length).toBe(1);
+
+    const undone = editorReducer(applied, { type: EditorEventType.HISTORY.UNDO, payload: {} });
+    expect(undone.presentation.slideset.slides[0]["layout-id"]).toBe(originalLayout);
+
+    const redone = editorReducer(undone, { type: EditorEventType.HISTORY.REDO, payload: {} });
+    expect(redone.presentation.slideset.slides[0]["layout-id"]).toBe("two-content");
+  });
+
+  test("LAYOUT.RESET is undoable (edited geometry restored on undo)", () => {
+    let state = createInitialEditorState();
+    const titleId = state.presentation.slideset.slides[0].contents.text[0].id;
+
+    // Move a placeholder-linked element so reset has something to restore.
+    state = editorReducer(state, {
+      type: EditorEventType.ELEMENT.UPDATE,
+      payload: { elementId: titleId, updates: { position: { x: 999, y: 999 } } },
+    });
+    const movedX =
+      state.presentation.slideset.slides[0].contents.text[0].position.x;
+    expect(movedX).toBe(999);
+
+    const reset = editorReducer(state, {
+      type: EditorEventType.LAYOUT.RESET,
+      payload: {},
+    });
+    expect(
+      reset.presentation.slideset.slides[0].contents.text[0].position.x,
+    ).not.toBe(999);
+
+    const undone = editorReducer(reset, { type: EditorEventType.HISTORY.UNDO, payload: {} });
+    expect(
+      undone.presentation.slideset.slides[0].contents.text[0].position.x,
+    ).toBe(999);
+  });
+
   test("ELEMENT.UPDATE_MANY updates visibility in one history entry", () => {
     const state = createInitialEditorState();
     const textIds = state.presentation.slideset.slides[0].contents.text.map(
@@ -189,6 +258,47 @@ describe("editorReducer", () => {
         (element) => element.hidden,
       ),
     ).toBe(true);
+    expect(result.past).toHaveLength(1);
+  });
+
+  test("ELEMENT.UPDATE_MANY updates z-index across all element collections", () => {
+    const initial = createInitialEditorState();
+    const slide = initial.presentation.slideset.slides[0];
+    const state = {
+      ...initial,
+      presentation: {
+        ...initial.presentation,
+        slideset: {
+          ...initial.presentation.slideset,
+          slides: [{
+            ...slide,
+            contents: {
+              ...slide.contents,
+              shapes: [{ id: "shape-1", "z-index": 1 }],
+              tables: [{ id: "table-1", "z-index": 2 }],
+              groups: [{ id: "group-1", "z-index": 3 }],
+            },
+          }],
+        },
+      },
+    };
+
+    const result = editorReducer(state, {
+      type: EditorEventType.ELEMENT.UPDATE_MANY,
+      payload: {
+        updates: [
+          { elementId: "shape-1", updates: { "z-index": 3 } },
+          { elementId: "table-1", updates: { "z-index": 1 } },
+          { elementId: "group-1", updates: { "z-index": 2 } },
+        ],
+      },
+    });
+    const contents =
+      result.presentation.slideset.slides[0].contents;
+
+    expect(contents.shapes[0]["z-index"]).toBe(3);
+    expect(contents.tables[0]["z-index"]).toBe(1);
+    expect(contents.groups[0]["z-index"]).toBe(2);
     expect(result.past).toHaveLength(1);
   });
 

@@ -1,8 +1,8 @@
-import { getMediaFile } from "./mediaStorage";
+import { getMediaFile } from "../storage/mediaStorage";
 import {
   findNonPortableAssetReferences,
   serializePresentation,
-} from "./serializationOperations";
+} from "../serialization/serializationOperations";
 
 const extensionFromBlob = (blob, fallback) => (blob.type || "").split("/")[1] || fallback;
 

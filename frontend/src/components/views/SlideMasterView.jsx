@@ -609,6 +609,7 @@ export default function SlideMasterView({
   selectedMasterLayoutId,
   onSelectedLayoutChange,
   selectedMasterElementId,
+  selectedMasterElementIds = [],
   onSelectMasterElement,
   onSaveSelection,
   onStartEditing,
@@ -731,7 +732,7 @@ export default function SlideMasterView({
           placeholderActionsDisabled
           hideMasterElements={!selectedLayout}
           selectedElementId={selectedMasterElementId}
-          selectedElementIds={selectedMasterElementId ? [selectedMasterElementId] : []}
+          selectedElementIds={selectedMasterElementIds}
           onSelectElement={onSelectMasterElement}
           onChangeTextElement={onMasterViewChangeText}
           onChangeParagraphs={onMasterViewChangeParagraphs}
@@ -745,7 +746,7 @@ export default function SlideMasterView({
           onResizeMediaElement={onMasterViewResizeMedia}
           onDeleteMedia={onMasterViewDeleteMedia}
           onDeleteTextElement={onMasterViewDeleteText}
-          onDeleteSelection={() => onMasterViewDeleteSelection?.(selectedMasterElementId)}
+          onDeleteSelection={() => onMasterViewDeleteSelection?.(selectedMasterElementIds)}
           updateElement={onMasterViewAutoFitText}
           updateMedia={onMasterViewAutoFitMedia}
           cropSignal={cropSignal}

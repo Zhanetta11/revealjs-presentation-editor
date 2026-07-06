@@ -27,7 +27,7 @@ import EditorPage from "../../../pages/EditorPage";
 describe("context menu -> font dialog -> formatting integration (real EditorPage)", () => {
   beforeAll(() => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    global.ResizeObserver = class {
+    globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
       disconnect() {}

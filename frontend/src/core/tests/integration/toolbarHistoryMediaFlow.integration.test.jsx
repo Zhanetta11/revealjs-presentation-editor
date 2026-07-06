@@ -44,7 +44,7 @@ describe("toolbar history buttons + media upload integration (real EditorPage)",
 
   beforeAll(() => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    global.ResizeObserver = class {
+    globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
       disconnect() {}
@@ -54,12 +54,12 @@ describe("toolbar history buttons + media upload integration (real EditorPage)",
   beforeEach(() => {
     records.clear();
     vi.clearAllMocks();
-    originalImage = global.Image;
-    global.Image = FakeImage;
+    originalImage = globalThis.Image;
+    globalThis.Image = FakeImage;
   });
 
   afterEach(() => {
-    global.Image = originalImage;
+    globalThis.Image = originalImage;
   });
 
   function renderEditor(presentationId) {

@@ -56,12 +56,12 @@ describe("useMediaUpload -> mediaStorage -> useEditorActions integration", () =>
   beforeEach(() => {
     records.clear();
     vi.clearAllMocks();
-    originalImage = global.Image;
-    global.Image = FakeImage;
+    originalImage = globalThis.Image;
+    globalThis.Image = FakeImage;
   });
 
   afterEach(() => {
-    global.Image = originalImage;
+    globalThis.Image = originalImage;
   });
 
   test("uploading an image stores the file and adds a media element sized to fit the slide", async () => {

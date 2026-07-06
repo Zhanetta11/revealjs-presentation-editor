@@ -98,7 +98,7 @@
   animation-timing-function: ease-out;
 }
 
-[data-para].play-effect {
+[data-paragraph-index].play-effect {
   display: inline-block;
   width: 100%;
 }

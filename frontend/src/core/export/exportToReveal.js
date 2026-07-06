@@ -18,7 +18,7 @@ import {
   buildMediaReflectionStyle,
   buildMediaReflectionContentStyle,
   buildVideoAttributes,
-  buildAnimationMap,
+  buildPlaybackAnimationMap,
   styleToString,
 } from "../render/revealRenderer";
 import {
@@ -36,6 +36,7 @@ import {
 } from "../utils/listUtils";
 import { downloadHtml } from "./downloadHtml";
 import { downloadBackend } from "./downloadBackend";
+import { TRANSPARENT_SLIDE_BG } from "../operations/slideOperations";
 import { getMediaFile } from "../persistence/persistenceFacade";
 import { fontFormat, fontExtension } from "../utils/fontFormat";
 import JSZip from "jszip";
@@ -186,24 +187,6 @@ function buildFontFaceCss(fontMap) {
     );
   }
   return rules.join("\n");
-}
-
-function buildAdjustedSequenceMap(animations, textElements) {
-  if (!animations?.length) return new Map();
-  const sorted = [...animations].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
-  const result = new Map();
-  let next = 1;
-  for (const anim of sorted) {
-    result.set(anim.id, next);
-    const byParagraph = (anim["effect-options"]?.sequence ?? "as-one-object") !== "as-one-object";
-    if (byParagraph) {
-      const textEl = textElements.find((el) => el.id === anim.id);
-      next += textEl?.paragraphs?.length ?? 1;
-    } else {
-      next += 1;
-    }
-  }
-  return result;
 }
 
 function fragmentClassesFor(effect) {
@@ -513,17 +496,13 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
   const transitionSpeed = TRANSITION_SPEED_MAP[transitionDuration] ?? "default";
   const rawBackground = slide.contents?.background ?? null;
   const isImageBackground = rawBackground && typeof rawBackground === "object" && rawBackground.type === "image";
-  const background = !rawBackground || isImageBackground
+  const background = !rawBackground || isImageBackground || rawBackground === TRANSPARENT_SLIDE_BG
     ? "var(--bg-light, white)"
     : rawBackground;
   const backgroundImageHtml = isImageBackground
     ? buildBgFillHtml(rawBackground, width, height, getSrc)
     : "";
-  const animationMap = buildAnimationMap(slide);
-  const adjustedSeqMap = buildAdjustedSequenceMap(
-    slide.contents?.animations ?? [],
-    textElements,
-  );
+  const animationMap = buildPlaybackAnimationMap(slide);
 
   const textElementsHtml = textElements
     .filter((element) => !element.hidden)
@@ -534,18 +513,15 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
       const placeholderPadding = getPlaceholderPadding(presentation, slide, textElement);
       const placeholderBackground = getPlaceholderBackground(presentation, slide, textElement);
       const style = styleToString(buildTextElementStyle(textElement, masterFormatting, placeholderFormatting, placeholderPadding, placeholderBackground));
-      const adjustedAnim = animation && adjustedSeqMap.has(animation.id)
-        ? { ...animation, sequence: adjustedSeqMap.get(animation.id) }
-        : animation;
       const content = buildTextElementContent(
         textElement,
-        adjustedAnim,
+        animation,
         placeholderFormatting,
         masterFormatting,
         slideAnchorMap,
       );
       if (!animation || sequenceMode === "as-one-object") {
-        return applyFragment(content, style, adjustedAnim);
+        return applyFragment(content, style, animation);
       }
       return `<div style="${style}">${content}</div>`;
     })
@@ -577,10 +553,7 @@ function buildSlideSection(slide, width, height, getSrc, masterFormatting, prese
       const reflectionHtml = isVideo ? "" : buildReflectionHtml(media, src);
 
       const innerHtml = `${mediaHtml}${borderHtml}${bevelHtml}`;
-      const adjustedMediaAnim = animation && adjustedSeqMap.has(animation.id)
-        ? { ...animation, sequence: adjustedSeqMap.get(animation.id) }
-        : animation;
-      return `${applyFragment(innerHtml, wrapperStyle, adjustedMediaAnim)}${reflectionHtml}`;
+      return `${applyFragment(innerHtml, wrapperStyle, animation)}${reflectionHtml}`;
     })
     .join("");
 

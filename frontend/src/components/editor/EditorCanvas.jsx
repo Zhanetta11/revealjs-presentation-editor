@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import "./EditorCanvas.css";
 import { getSlideSize } from "../../core/render/slidesetRenderUtils";
-import { buildColorThemeStyle, buildAdjustedAnimationMap } from "../../core/render/revealRenderer";
+import { buildColorThemeStyle, buildAnimationMap } from "../../core/render/revealRenderer";
 import { useCanvasInteractions } from "../../hooks/useCanvasInteractions";
 import { useMediaSrc } from "../../hooks/media/useMediaSrc";
 import { TRANSPARENT_SLIDE_BG } from "../../core/operations/slideOperations";
@@ -199,8 +199,8 @@ export default function EditorCanvas({
 
   const animationSequenceMap = useMemo(
     () => {
-      const adjusted = buildAdjustedAnimationMap(slide);
-      return new Map([...adjusted.entries()].map(([id, anim]) => [id, anim.sequence]));
+      const animations = buildAnimationMap(slide);
+      return new Map([...animations.entries()].map(([id, anim]) => [id, anim.sequence]));
     },
     [slide],
   );

@@ -85,7 +85,7 @@ function ThemeThumbnail({ theme, isActive, onClick }) {
     );
 }
 
-function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColorSchemeId, onColorSchemeChange, colorTheme, onUpdateThemeColor }) {
+function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColorSchemeId, onColorSchemeChange, onColorSchemeHover, onColorSchemeLeave, colorTheme, onUpdateThemeColor }) {
     const [showSizeMenu, setShowSizeMenu] = useState(false);
     const [showCustomSize, setShowCustomSize] = useState(false);
     const sizeRef = useRef(null);
@@ -134,6 +134,8 @@ function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColo
                     <ColorsDropdown
                         currentSchemeId={currentColorSchemeId}
                         onColorSchemeSelect={onColorSchemeChange}
+                        onColorSchemeHover={onColorSchemeHover}
+                        onColorSchemeLeave={onColorSchemeLeave}
                         colorTheme={colorTheme}
                         onUpdateThemeColor={onUpdateThemeColor}
                     />
@@ -237,7 +239,7 @@ function RightPanel({ presentation, onApplyFont, onUpdateDimensions, currentColo
     );
 }
 
-export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onUpdateDimensions, onUpdateThemeColor }) {
+export default function DesignTab({ presentation, onApplyTheme, onPreviewTheme, onApplyFont, onUpdateDimensions, onUpdateThemeColor }) {
     const currentTheme = useMemo(
         () => presentation?.slideset?.master?.["color-theme"] ?? [],
         [presentation?.slideset?.master],
@@ -274,8 +276,25 @@ export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onU
     };
 
     const handleColorSchemeSelect = (colorScheme) => {
+        onPreviewTheme?.(null);
         applyAndSaveColorScheme(colorScheme);
     };
+
+    const handleColorSchemeHover = (colorScheme) => {
+        if (!activeTheme || !onPreviewTheme) return;
+        const decorations = applyColorSchemeToDesign(activeTheme, colorScheme);
+        const updatedColorTheme = updateThemeBackgroundFromScheme(currentTheme, colorScheme);
+        onPreviewTheme({
+            colorTheme: updatedColorTheme,
+            decorations: decorations?.decorations,
+        });
+    };
+
+    const handleColorSchemeLeave = () => {
+        onPreviewTheme?.(null);
+    };
+
+    useEffect(() => () => onPreviewTheme?.(null), [onPreviewTheme]);
 
     return (
         <div className="design-tab-wrapper">
@@ -301,6 +320,8 @@ export default function DesignTab({ presentation, onApplyTheme, onApplyFont, onU
                 onUpdateDimensions={onUpdateDimensions}
                 currentColorSchemeId={currentColorSchemeId}
                 onColorSchemeChange={handleColorSchemeSelect}
+                onColorSchemeHover={handleColorSchemeHover}
+                onColorSchemeLeave={handleColorSchemeLeave}
                 colorTheme={currentTheme}
                 onUpdateThemeColor={onUpdateThemeColor}
             />

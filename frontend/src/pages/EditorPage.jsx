@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SlideList from "../components/views/SlideList";
 import Toolbar from "../components/editor/Toolbar";
@@ -20,6 +21,25 @@ import { useEditorController } from "../hooks/editor/useEditorController";
 export default function EditorPage() {
   const navigate = useNavigate();
   const ctrl = useEditorController();
+
+  const [themePreview, setThemePreview] = useState(null);
+  const displayPresentation = useMemo(() => {
+    const presentation = ctrl.presentation;
+    if (!themePreview || !presentation?.slideset?.master) return presentation;
+    return {
+      ...presentation,
+      slideset: {
+        ...presentation.slideset,
+        master: {
+          ...presentation.slideset.master,
+          "color-theme": themePreview.colorTheme,
+          ...(themePreview.decorations
+            ? { decorations: themePreview.decorations }
+            : {}),
+        },
+      },
+    };
+  }, [ctrl.presentation, themePreview]);
 
   const updateSelectedMedia = (updates) =>
     ctrl.selectedMediaElement && (ctrl.isSlideMasterOpen
@@ -122,6 +142,7 @@ export default function EditorPage() {
           onOpenSelectionPane={() => ctrl.setShowSelectionPane(true)}
           objectSelectionMode={ctrl.objectSelectionMode}
           onApplyTheme={ctrl.updateMasterTheme}
+          onPreviewTheme={setThemePreview}
           onApplyFont={ctrl.updateMasterFormatting}
           onApplyLayoutFont={ctrl.applyLayoutFont}
           onUpdateDimensions={ctrl.handleUpdateDimensions}
@@ -262,7 +283,7 @@ export default function EditorPage() {
                 onDeleteSlide={ctrl.deleteSlide}
                 slideWidth={ctrl.slideWidth}
                 slideHeight={ctrl.slideHeight}
-                presentation={ctrl.presentation}
+                presentation={displayPresentation}
               />
             )}
 
@@ -270,7 +291,7 @@ export default function EditorPage() {
               {ctrl.selectedSlide && (
                 <EditorCanvas
                   slide={ctrl.selectedSlide}
-                  presentation={ctrl.presentation}
+                  presentation={displayPresentation}
                   onChangeTextElement={ctrl.updateTextElementContent}
                   onChangeParagraphs={ctrl.handleChangeParagraphs}
                   onMoveTextElement={ctrl.handleMoveElement}

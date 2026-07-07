@@ -73,6 +73,7 @@ export default function ToolbarContent({
   onOpenSelectionPane,
   objectSelectionMode,
   onApplyTheme,
+  onPreviewTheme,
   onApplyFont,
   onApplyLayoutFont,
   onUpdateDimensions,
@@ -230,6 +231,7 @@ export default function ToolbarContent({
         <DesignTab
           presentation={presentation}
           onApplyTheme={onApplyTheme}
+          onPreviewTheme={onPreviewTheme}
           onApplyFont={onApplyFont}
           onUpdateDimensions={onUpdateDimensions}
           onUpdateThemeColor={onUpdateThemeColor}

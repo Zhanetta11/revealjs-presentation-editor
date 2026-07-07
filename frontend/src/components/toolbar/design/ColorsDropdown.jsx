@@ -18,7 +18,7 @@ function ColorPalettePreview({ colors }) {
   );
 }
 
-export function ColorsDropdown({ onColorSchemeSelect, currentSchemeId, colorTheme, onUpdateThemeColor }) {
+export function ColorsDropdown({ onColorSchemeSelect, onColorSchemeHover, onColorSchemeLeave, currentSchemeId, colorTheme, onUpdateThemeColor }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showCustomizeDialog, setShowCustomizeDialog] = useState(false);
   const ref = useRef(null);
@@ -30,11 +30,12 @@ export function ColorsDropdown({ onColorSchemeSelect, currentSchemeId, colorThem
     const handleClickOutside = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
         setIsOpen(false);
+        onColorSchemeLeave?.();
       }
     };
     document.addEventListener("mousedown", handleClickOutside, true);
     return () => document.removeEventListener("mousedown", handleClickOutside, true);
-  }, []);
+  }, [onColorSchemeLeave]);
 
   const handleItemClick = (scheme) => {
     onColorSchemeSelect(scheme);
@@ -45,7 +46,10 @@ export function ColorsDropdown({ onColorSchemeSelect, currentSchemeId, colorThem
     <div className="colors-dropdown-wrapper" ref={ref}>
       <button
         className="colors-dropdown-btn"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (isOpen) onColorSchemeLeave?.();
+          setIsOpen(!isOpen);
+        }}
         title={displayName}
       >
         <span className="colors-dropdown-label">{displayName}</span>
@@ -54,13 +58,14 @@ export function ColorsDropdown({ onColorSchemeSelect, currentSchemeId, colorThem
 
       {isOpen && (
         <div className="colors-dropdown-panel">
-          <div className="colors-list">
+          <div className="colors-list" onMouseLeave={() => onColorSchemeLeave?.()}>
             {COLOR_SCHEMES.map((scheme) => (
               <button
                 key={scheme.id}
                 className={`colors-item ${
                   currentSchemeId === scheme.id ? "active" : ""
                 }`}
+                onMouseEnter={() => onColorSchemeHover?.(scheme)}
                 onClick={() => handleItemClick(scheme)}
                 title={scheme.name}
               >

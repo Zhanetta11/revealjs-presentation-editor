@@ -211,7 +211,7 @@ export default function EditorPage() {
       <div className="editor-body">
         {ctrl.isSlideMasterOpen ? (
           <SlideMasterView
-            presentation={ctrl.presentation}
+            presentation={displayPresentation}
             activeMasterSlide={ctrl.activeMasterSlide}
             selectedMasterLayoutId={ctrl.selectedMasterLayoutId}
             onSelectedLayoutChange={ctrl.setSelectedMasterLayoutId}

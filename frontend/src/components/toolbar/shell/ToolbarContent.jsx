@@ -144,6 +144,8 @@ export default function ToolbarContent({
           onClose={onCloseSlideMaster}
           presentation={presentation}
           onApplyTheme={onApplyTheme}
+          onPreviewTheme={onPreviewTheme}
+          onUpdateThemeColor={onUpdateThemeColor}
           onApplyBackground={onApplyBackground}
           onApplyFont={onApplyFont}
           onApplyLayoutFont={onApplyLayoutFont}

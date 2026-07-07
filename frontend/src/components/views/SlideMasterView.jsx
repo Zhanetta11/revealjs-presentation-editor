@@ -312,7 +312,7 @@ function MasterThumb({ label, isSelected, onClick, presentation, layout, isMaste
 }
 
 export function SlideMasterRibbon({
-  onClose, presentation, onApplyTheme, onApplyFont, onUpdateDimensions,
+  onClose, presentation, onApplyTheme, onPreviewTheme, onUpdateThemeColor, onApplyFont, onUpdateDimensions,
   masterName, onRenameMaster, selectedMasterLayoutId, onInsertLayout, onRenameLayout,
   onDeleteLayout,
   onAddTextPlaceholder, onImageUpload, onVideoUpload,
@@ -329,6 +329,23 @@ export function SlideMasterRibbon({
 
   const colorTheme = presentation?.slideset?.master?.["color-theme"] ?? [];
   const currentFont = presentation?.slideset?.master?.formatting?.font ?? "Arial";
+
+  const handleColorSchemeHover = (colorScheme) => {
+    const activeTheme = findActiveTheme(colorTheme);
+    if (!activeTheme || !onPreviewTheme) return;
+    const decorations = applyColorSchemeToDesign(activeTheme, colorScheme);
+    const updatedColorTheme = updateThemeBackgroundFromScheme(colorTheme, colorScheme);
+    onPreviewTheme({
+      colorTheme: updatedColorTheme,
+      decorations: decorations?.decorations,
+    });
+  };
+
+  const handleColorSchemeLeave = () => {
+    onPreviewTheme?.(null);
+  };
+
+  useEffect(() => () => onPreviewTheme?.(null), [onPreviewTheme]);
   const isRenamingLayout = !!selectedMasterLayoutId;
   const selectedLayout = selectedMasterLayoutId
     ? (presentation?.slideset?.layouts ?? []).find((l) => l["layout-id"] === selectedMasterLayoutId)
@@ -524,6 +541,7 @@ export function SlideMasterRibbon({
               <ColorsDropdown
                 currentSchemeId={presentation?.slideset?.master?.["current-color-scheme-id"]}
                 onColorSchemeSelect={(colorScheme) => {
+                  onPreviewTheme?.(null);
                   const activeTheme = findActiveTheme(colorTheme);
                   if (activeTheme) {
                     const decorations = applyColorSchemeToDesign(activeTheme, colorScheme);
@@ -533,6 +551,10 @@ export function SlideMasterRibbon({
                     });
                   }
                 }}
+                onColorSchemeHover={handleColorSchemeHover}
+                onColorSchemeLeave={handleColorSchemeLeave}
+                colorTheme={colorTheme}
+                onUpdateThemeColor={onUpdateThemeColor}
               />
             </div>
 

@@ -311,8 +311,7 @@ describe("useEditorPersistenceController Electron Save As isolation", () => {
       await result.current.handleSaveAs();
     });
 
-    // The old project must never be written to first.
-    expect(savePresentation).not.toHaveBeenCalled();
+    expect(savePresentation).toHaveBeenCalledOnce();
     // The snapshot is built from the in-memory presentation and committed to
     // the new folder only.
     expect(mocks.writeAndCommitElectronProjectSnapshot).toHaveBeenCalledWith(
@@ -329,6 +328,12 @@ describe("useEditorPersistenceController Electron Save As isolation", () => {
     expect(setPresentationSource).toHaveBeenLastCalledWith(
       expect.objectContaining({ projectFolder: "C:\\Projects\\New" }),
     );
+    expect(
+      mocks.writeAndCommitElectronProjectSnapshot.mock.invocationCallOrder[0],
+    ).toBeLessThan(savePresentation.mock.invocationCallOrder[0]);
+    expect(
+      setPresentationSource.mock.invocationCallOrder.at(-1),
+    ).toBeLessThan(savePresentation.mock.invocationCallOrder[0]);
   });
 
   it("leaves the old project untouched when Save As is cancelled", async () => {

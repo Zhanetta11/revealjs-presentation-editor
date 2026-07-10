@@ -217,7 +217,7 @@ Media and fonts are stored separately from the JSON and referenced through relat
 | Nargiza Alieva | Data model and core architecture | Presentation, slide, placeholder, and layout model; editor events; reducer/store; state operations; master layout inheritance; propagation of layout changes; persistence; serialization; validation; internal project structure; orchestration hooks; unit tests; architecture documentation and UML. |
 | Zhanetta Tynymbekova | Rendering, behavior, export, and deployment | Reveal.js preview rendering, Reveal.js export pipeline, theme and master color palette system, transitions, animations, picture effects, visual rendering settings, global settings panel, Electron/web deployment integration, integration tests, setup and deployment documentation. |
 
-## Notes for Review
+## Submission Notes
 
 - Main application code is in `frontend/`.
 - Do not include `frontend/node_modules/` in a submitted archive; it is recreated with `npm install`.

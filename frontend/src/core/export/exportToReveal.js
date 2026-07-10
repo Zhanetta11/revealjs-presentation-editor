@@ -600,6 +600,8 @@ function buildHtmlContent(title, colorThemeCss, width, height, slideSections, fo
     .reveal .slides section .fragment { transition-duration: 800ms; }
     .reveal .slides section .fragment[data-fragment-speed="fast"] { transition-duration: 200ms; }
     .reveal .slides section .fragment[data-fragment-speed="slow"] { transition-duration: 2200ms; }
+    .reveal .slides section .fragment.grow { opacity: 0; visibility: hidden; transform: scale(0.5); }
+    .reveal .slides section .fragment.grow.visible { opacity: 1; visibility: inherit; transform: scale(1); }
   </style>
 </head>
 <body>

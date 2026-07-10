@@ -1,46 +1,35 @@
 # Web-Based Reveal.js Presentation Editor
 
-Local-first presentation editor built with React, Vite, Reveal.js, and Electron.
+Local-first presentation editor for creating and editing Reveal.js slide decks in the browser and in an Electron desktop app.
 
-The editor lets users create and edit slide decks with text, media, layouts, Slide Master placeholders, formatting, links, undo/redo, autosave, project-folder saving, and Reveal.js preview/export.
+The project provides a PowerPoint-like editing workflow: users can create slides, edit text and media elements, work with layouts and Slide Master placeholders, preview the deck with Reveal.js, save projects locally, and export presentations.
 
-## What this project is
+## Project Context
 
-The application is local-first: the active presentation is edited in the browser/Electron renderer, stored locally, and saved/exported from the client side.
+This repository contains the final implementation of a web-based presentation editor. The main application code is located in `frontend/`.
 
 The same React editor runs in two environments:
 
-- Browser mode, using IndexedDB and, where available, the File System Access API.
+- Browser mode, using IndexedDB and the File System Access API where supported.
 - Electron mode, using native dialogs and filesystem access through Electron IPC.
 
-Reveal.js is used as the presentation runtime for preview/export. The editing canvas itself is custom React UI, not Reveal.js.
+Reveal.js is used as the presentation runtime for preview and export. The editing canvas itself is a custom React interface.
 
-## Main features
+## Main Features
 
-- Slide editing with text, shapes, media, tables, layouts, and Slide Master support.
-- Text formatting, paragraph/list formatting, links, placeholders, and formatting inheritance.
-- PowerPoint-like draft/project saving model.
+- Slide creation, deletion, duplication, reordering, and hiding.
+- Text, shape, media, table, layout, and Slide Master editing.
+- Text formatting, paragraph/list formatting, hyperlinks, and formatting inheritance.
+- Undo/redo based on immutable presentation-state history.
+- Autosave for draft-backed and project-folder-backed presentations.
 - Browser draft storage through IndexedDB.
-- Browser project-folder saving through the File System Access API in Chromium-based browsers.
-- Electron project-folder saving through native dialogs and filesystem IPC.
-- Autosave that writes to the active source: draft cache before first Save, project folder after Save.
-- Save / Save As with project-folder structure:
+- Browser project-folder saving through the File System Access API.
+- Electron project-folder saving through native filesystem dialogs.
+- Reveal.js preview and export.
+- ZIP/single-file export paths with portable media/font references.
+- Unit, integration, and component test coverage.
 
-  ```text
-  Project Name/
-    presentation.json
-    media/
-      image/
-      video/
-    fonts/
-  ```
-
-- Portable media/font export: internal runtime links are resolved into `media/...` and `fonts/...` project paths.
-- Undo/redo through immutable presentation-state history.
-- Reveal.js preview and export, including ZIP/single-file export paths.
-- Unit, integration, UI/component, and manual test coverage.
-
-## Tech stack
+## Tech Stack
 
 - React 19
 - Vite 8
@@ -53,7 +42,13 @@ Reveal.js is used as the presentation runtime for preview/export. The editing ca
 - React Testing Library
 - ESLint
 
-## Development setup
+## How to Run
+
+Open a terminal in the project root and enter the frontend directory:
+
+```bash
+cd frontend
+```
 
 Install dependencies:
 
@@ -61,59 +56,39 @@ Install dependencies:
 npm install
 ```
 
-Run browser development mode:
+Run the browser development version:
 
 ```bash
 npm run dev
 ```
 
-Open:
+Open the application:
 
 ```text
 http://localhost:5173
 ```
 
-Run Electron development mode:
+Run the Electron development version:
 
 ```bash
 npm run dev:electron
 ```
 
-Build browser production bundle:
+## Verification
 
-```bash
-npm run build
-```
-
-Build Electron package:
-
-```bash
-npm run build:electron
-```
-
-Platform-specific Electron builds:
-
-```bash
-npm run build:win
-npm run build:mac
-npm run build:linux
-```
-
-## Verification commands
-
-Run all tests:
+Run all automated tests:
 
 ```bash
 npm test -- --run
 ```
 
-Run lint:
+Run linting:
 
 ```bash
 npm run lint
 ```
 
-Run production build:
+Build the production browser bundle:
 
 ```bash
 npm run build
@@ -122,18 +97,74 @@ npm run build
 Current verification status:
 
 ```text
-Vitest: 61 files passed, 564 tests passed
+Vitest: 61 test files passed, 564 tests passed
 ESLint: passed
 Production build: passed
 ```
 
-The production build may show a Vite chunk-size warning. That warning does not fail the build.
+The production build may show a Vite chunk-size warning. This warning does not fail the build.
 
-## Architecture overview
+## Electron Build
 
-The editor uses an event-driven local-first architecture.
+Build the Electron package:
 
-User actions start in React components and hooks. The UI does not directly mutate the presentation JSON as the final source of truth. Instead, user actions are converted into editor events, dispatched through the event bus, handled by the reducer, and committed into the presentation model.
+```bash
+npm run build:electron
+```
+
+Platform-specific builds:
+
+```bash
+npm run build:win
+npm run build:mac
+npm run build:linux
+```
+
+Electron-specific documentation is available in:
+
+```text
+frontend/docs/electron/README.md
+frontend/docs/electron/SETUP.md
+frontend/docs/electron/DEVELOPER.md
+```
+
+## Project Structure
+
+```text
+revealjs-presentation-editor/
+  README.md
+  docs/
+    sprint1_results.md
+  frontend/
+    README.md
+    package.json
+    package-lock.json
+    index.html
+    vite.config.js
+    vitest.config.js
+    eslint.config.js
+    electron-builder.config.cjs
+    public/
+    electron/
+    docs/
+    src/
+```
+
+Important frontend areas:
+
+- `frontend/src/components/` - React UI, editor canvas, dialogs, toolbars, panels, and views.
+- `frontend/src/hooks/editor/` - editor controllers and composition logic.
+- `frontend/src/core/events/` - editor events and event bus.
+- `frontend/src/core/store/editorStore.js` - reducer, history, undo/redo updates.
+- `frontend/src/core/operations/` - domain operations for slides, text, media, layouts, master slides, z-order, and fonts.
+- `frontend/src/core/persistence/` - draft/project storage, autosave, serialization, and project-folder persistence.
+- `frontend/src/core/render/` - rendering helpers used by the editor canvas and preview.
+- `frontend/src/core/export/` - Reveal.js export and download logic.
+- `frontend/electron/` - Electron main/preload process, native dialogs, filesystem IPC, logging, and configuration.
+
+## Architecture Overview
+
+The editor follows an event-driven local-first architecture.
 
 Typical flow:
 
@@ -147,151 +178,49 @@ UI interaction
   -> autosave / persistence / export
 ```
 
-The DOM is only the rendering of the model. The presentation model is the source of truth for save, autosave, undo/redo, preview, and export.
+The presentation model is the source of truth for saving, autosave, undo/redo, preview, and export. React components render and edit that model but do not directly write project files.
 
-Important areas:
+## Persistence Model
 
-- `src/components/` - React UI, editor canvas, dialogs, toolbars, panels, views.
-- `src/hooks/editor/` - editor controllers and composition logic.
-- `src/core/events/` - editor event definitions and event bus.
-- `src/core/store/editorStore.js` - reducer, history, undo/redo state updates.
-- `src/core/operations/` - domain operations for slides, text, media, layouts, master, z-order, fonts.
-- `src/core/persistence/` - draft/project storage, autosave, project-folder serialization.
-- `src/core/render/` - render helpers used by canvas/preview.
-- `src/core/export/` - Reveal.js export and download logic.
-- `electron/` - Electron main/preload process code, native dialogs, filesystem IPC.
+The editor separates unsaved drafts from saved project folders.
 
-## Persistence model
-
-The editor separates draft storage from saved project folders.
-
-Before the first explicit Save:
+Before the first explicit save:
 
 ```text
 active source = draft
 ```
 
-After successful Save:
+After saving to a project folder:
 
 ```text
 active source = project folder
 ```
 
-Draft storage is used for unsaved work and recovery. Project-folder storage is the authoritative saved source after Save.
-
-The source metadata model tracks whether a presentation is draft-backed or project-backed. Autosave reads this metadata and writes to the correct sink.
-
-## Browser storage
-
-Browser mode uses IndexedDB as the reliable baseline.
-
-Draft presentations are stored through the IndexedDB adapter. In Chromium browsers, the File System Access API can additionally link a presentation to a real project folder selected by the user.
-
-Browser project folder handles are stored in IndexedDB because the browser does not expose raw local paths for security reasons. If folder permission expires, the project should still be treated as a project source rather than silently becoming a draft.
-
-## Electron storage
-
-Electron mode uses the same React editor, but with desktop filesystem access through IPC.
-
-The renderer process does not write files directly. It calls safe functions exposed from `electron/preload.cjs`, which send IPC messages to `electron/main.cjs`. The main process performs native dialog and filesystem operations.
-
-Electron draft cache is stored in the app's user data area. Saved project folders are stored wherever the user chooses.
-
-Electron also stores local metadata mapping:
+Project folders use a portable structure:
 
 ```text
-presentationId -> absolute project folder path
+Project Name/
+  presentation.json
+  media/
+    image/
+    video/
+  fonts/
 ```
 
-This mapping is local application metadata, not part of `presentation.json`, because absolute paths are machine-specific.
+Media and fonts are stored separately from the JSON and referenced through relative project paths.
 
-## Save and Save As
+## Team Responsibilities
 
-First Save from a draft:
+| Team member | Responsibility area | Main tasks |
+|---|---|---|
+| Altynai Munduzbaeva | Editor interaction and UI | Slide editing, placeholder content editing, slide add/delete/duplicate actions, text/media elements, drag-and-drop, resizing, positioning, slide list, context menus, dialogs, toolbar shell, canvas UI, UI tests, user guide. |
+| Nargiza Alieva | Data model and core architecture | Presentation, slide, placeholder, and layout model; editor events; reducer/store; state operations; master layout inheritance; propagation of layout changes; persistence; serialization; validation; internal project structure; orchestration hooks; unit tests; architecture documentation and UML. |
+| Zhanetta Tynymbekova | Rendering, behavior, export, and deployment | Reveal.js preview rendering, Reveal.js export pipeline, theme and master color palette system, transitions, animations, picture effects, visual rendering settings, global settings panel, Electron/web deployment integration, integration tests, setup and deployment documentation. |
 
-1. Flush/commit the current presentation state.
-2. Ask the user for a project folder.
-3. Write assets and fonts.
-4. Write `presentation.json` after assets are ready.
-5. Store the source mapping.
-6. Switch active source from draft to project.
-7. Clean up the draft only after the project commit is safe.
+## Notes for Review
 
-Save on a project-backed presentation writes to the existing project folder without asking again.
-
-Save As asks for a new project folder, writes the full snapshot there, and switches the active source only after the new folder commit succeeds. The old project is not overwritten during a failed or cancelled Save As.
-
-## Media and fonts
-
-Media and fonts are stored separately from the JSON.
-
-In draft mode, media can live in app storage/cache. During project-folder save, internal runtime references are resolved and copied into portable project paths:
-
-```text
-media/image/...
-media/video/...
-fonts/...
-```
-
-The saved `presentation.json` references those relative paths instead of embedding large base64 data.
-
-## Slide Master and inheritance
-
-The editor follows a PowerPoint-like hierarchy:
-
-```text
-Master Slide -> Layouts -> Normal Slides
-```
-
-The Master Slide stores global design/defaults. Layouts define reusable slide structures and placeholders. Normal slides reference layouts and can inherit placeholder geometry and formatting.
-
-Formatting is resolved through a cascade:
-
-```text
-master formatting
-  -> placeholder/layout formatting
-  -> paragraph formatting
-  -> run formatting
-```
-
-Explicit local formatting wins over inherited formatting. For lists, explicit `list-type: "none"` blocks inherited bullet/list formatting.
-
-## Undo and redo
-
-Undo/redo is implemented in the editor store with immutable presentation-state history.
-
-The history stores previous presentation states for content changes, not UI-only state like selection, dialogs, save status, or autosave status.
-
-Because operations return new immutable state instead of mutating old state in place, undo can keep references to previous states without deep-cloning the entire presentation after every small edit.
-
-## Testing
-
-The project has automated coverage across:
-
-- Unit tests for reducer, operations, serialization, persistence model, media geometry, text formatting.
-- Integration tests for event bus -> reducer -> state -> persistence/export flows.
-- UI/component tests with React Testing Library.
-- Manual checks for native Electron dialogs, real browser permission prompts, and visual/user workflows.
-
-Verified status:
-
-```text
-61 test files
-564 tests
-full suite passing
-lint passing
-production build passing
-```
-
-## Notes for contributors
-
-- Do not write directly to files from React UI components.
-- Keep persistence logic inside `src/core/persistence/` or Electron IPC modules.
-- Keep professor/shared JSON schema compatibility: do not rename or remove existing schema fields.
-- Prefer optional backward-compatible fields if extension is needed.
-- Keep browser mode working when changing Electron persistence.
-- Keep Electron filesystem access behind preload/main IPC.
-- Do not treat project-folder save as a simple JSON download; media and fonts must stay portable.
-- Add regression tests for confirmed bugs before or together with the fix.
-
-
+- Main application code is in `frontend/`.
+- Do not include `frontend/node_modules/` in a submitted archive; it is recreated with `npm install`.
+- Do not include generated build output such as `frontend/dist/`; it is recreated with `npm run build`.
+- `docs/sprint1_results.md` is a historical Sprint 1 report, not the current full feature list.
+- The current feature list and verification commands are documented in this root README and in `frontend/README.md`.

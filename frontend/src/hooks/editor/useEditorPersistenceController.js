@@ -239,9 +239,12 @@ export function useEditorPersistenceController({
       // first (that would write current edits into the current project sink).
       // saveProjectToFolder(true) builds directly from the in-memory snapshot,
       // commits to the newly chosen folder, and only then switches the source;
-      // a cancel or commit failure leaves the old project untouched.
+      // a cancel or commit failure leaves the old project untouched. After the
+      // source switch succeeds, run the normal save lifecycle against the new
+      // active project so save status and manual Save agree immediately.
       try {
-        await saveProjectToFolder(true);
+        const saved = await saveProjectToFolder(true);
+        if (saved) await savePresentation();
       } catch (error) {
         console.error(
           "[EditorPage] Failed to save presentation folder:",
@@ -286,7 +289,8 @@ export function useEditorPersistenceController({
     const renameTo = promptForPresentationName();
     if (renameTo === null) return;
     try {
-      await saveProjectToFolder(true, renameTo);
+      const saved = await saveProjectToFolder(true, renameTo);
+      if (saved) await savePresentation();
     } catch (error) {
       console.error(
         "[EditorPage] Failed to save presentation folder:",
@@ -302,6 +306,7 @@ export function useEditorPersistenceController({
     }
   }, [
     presentation,
+    savePresentation,
     saveProjectToFolder,
     canUseProjectFolders,
     promptForPresentationName,
